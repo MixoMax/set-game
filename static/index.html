@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <div id="setup">
+            <input type="text" id="seed-input" placeholder="Enter seed (optional)">
+            <div>
+                <input type="checkbox" id="infinite-mode-checkbox">
+                <label for="infinite-mode-checkbox">Infinite Mode</label>
+            </div>
+            <button id="start-button">Start Game</button>
+        </div>
+        <div id="game-board" class="hidden">
+            <div id="game-controls">
+                <div id="stats">
+                    <p>Time: <span id="timer">30</span>s</p>
+                    <p>Score: <span id="score">0</span></p>
+                </div>
+                <button id="hint-button">Hint</button>
+            </div>
+            <div id="card-grid"></div>
+        </div>
+    </div>
+
+    <div id="game-over-modal" class="hidden">
+        <div class="modal-content">
+            <h2>Game Over!</h2>
+            <p>Your score: <span id="final-score">0</span></p>
+            <input type="text" id="name-input" placeholder="Enter your name">
+            <button id="submit-score-button">Submit Score</button>
+            <h3>Leaderboard</h3>
+            <ul id="leaderboard-list"></ul>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
