@@ -1,4 +1,19 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Error dialog elements
+    const errorDialog = document.getElementById('error-dialog');
+    const errorMessage = document.querySelector('.error-message');
+    const errorCloseBtn = document.querySelector('.error-close-btn');
+
+    errorCloseBtn.addEventListener('click', () => {
+        errorDialog.classList.add('hidden');
+    });
+
+    function showMsg(message, color = 'red') {
+        errorMessage.textContent = message;
+        errorMessage.style.color = color;
+        errorDialog.classList.remove('hidden');
+    }
+
     const seedInput = document.getElementById('seed-input');
     const infiniteModeCheckbox = document.getElementById('infinite-mode-checkbox');
     const challengeModeCheckbox = document.getElementById('challenge-mode-checkbox');
@@ -282,7 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await replaceCards(cardsToCheck);
         } else {
             console.error("Set is invalid:", data.message);
-            alert(data.message);
+            showMsg(data.message);
         }
         selectedCards = [];
         document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
@@ -303,7 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (dealtCards.length < 12) {
                 await dealExtraCards();
             } else {
-                alert("No set found in 12 cards. Dealing a new game.");
+                showMsg("No set found in 12 cards. Dealing a new game.");
                 await dealInitialCards(seedInput.value + "" + Math.floor(Math.random() * 1000));
             }
         }
@@ -340,8 +355,10 @@ document.addEventListener('DOMContentLoaded', () => {
             setTimeout(() => {
                 document.querySelectorAll('.card.hint').forEach(c => c.classList.remove('hint'));
             }, 2000);
+        } else if (challengeMode) {
+            showMsg("Hint not available in challenge mode.");
         } else {
-            alert("No set found to hint.");
+            showMsg("No set found to hint.");
         }
     }
 
@@ -425,7 +442,7 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log("Game over.");
         gameBoardDiv.classList.add('hidden');
         if (challengeMode) {
-            alert("Congratulations! You found all the sets!");
+            showMsg("Congratulations! You found all the sets!", 'green');
             setupDiv.classList.remove('hidden');
         } else if (infiniteMode) {
             setupDiv.classList.remove('hidden');
@@ -450,7 +467,7 @@ document.addEventListener('DOMContentLoaded', () => {
     async function submitScore() {
         const name = nameInput.value;
         if (!name) {
-            alert('Please enter your name.');
+            showMsg('Please enter your name.');
             return;
         }
         await fetch('/api/v1/post_score', {
