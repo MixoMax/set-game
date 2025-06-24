@@ -5,7 +5,7 @@ This is a digital adaptation of the card game "Set". The game consists of a deck
 ## Game modes:
 - Time challenge: Find as many sets as possible within a given time limit.
 - Infinite mode: Play without a time limit, focusing on finding sets at your own pace.
-- Challenge mode: Find all sets in a given layout. (WIP, not yet implemented)
+- Challenge mode: Find all sets in a given layout. (WIP, not yet implemented: for this, we need an API route to get ALL sets in a given layout)
 
 ## How to play:
 1. Start the game and select a mode.

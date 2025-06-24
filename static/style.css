@@ -111,6 +111,11 @@ body {
     box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.6);
 }
 
+.card.found {
+    border-color: #7ed321;
+    box-shadow: 0 0 0 3px rgba(126, 211, 33, 0.6);
+}
+
 #game-over-modal {
     position: fixed;
     top: 0;

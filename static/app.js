@@ -1,12 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
     const seedInput = document.getElementById('seed-input');
     const infiniteModeCheckbox = document.getElementById('infinite-mode-checkbox');
+    const challengeModeCheckbox = document.getElementById('challenge-mode-checkbox');
     const startButton = document.getElementById('start-button');
     const setupDiv = document.getElementById('setup');
     const gameBoardDiv = document.getElementById('game-board');
     const cardGrid = document.getElementById('card-grid');
     const timerSpan = document.getElementById('timer');
     const scoreSpan = document.getElementById('score');
+    const challengeStats = document.getElementById('challenge-stats');
+    const setsFoundSpan = document.getElementById('sets-found');
+    const setsTotalSpan = document.getElementById('sets-total');
     const gameOverModal = document.getElementById('game-over-modal');
     const finalScoreSpan = document.getElementById('final-score');
     const nameInput = document.getElementById('name-input');
@@ -20,6 +24,9 @@ document.addEventListener('DOMContentLoaded', () => {
     let dealtCards = [];
     let selectedCards = [];
     let infiniteMode = false;
+    let challengeMode = false;
+    let allSets = [];
+    let foundSets = [];
     let excludedCardsQueue = [];
     let hintSet = null;
 
@@ -39,16 +46,26 @@ document.addEventListener('DOMContentLoaded', () => {
     function startGame() {
         console.log("Starting game...");
         infiniteMode = infiniteModeCheckbox.checked;
+        challengeMode = challengeModeCheckbox.checked;
         setupDiv.classList.add('hidden');
         gameBoardDiv.classList.remove('hidden');
         gameOverModal.classList.add('hidden');
         score = 0;
         scoreSpan.textContent = score;
+        challengeStats.classList.add('hidden');
+        document.querySelector('#stats p:first-child').classList.remove('hidden');
+        document.querySelector('#stats p:nth-child(2)').classList.remove('hidden');
+
+
         if (infiniteMode) {
             document.querySelector('#stats p:first-child').classList.add('hidden');
             excludedCardsQueue = [];
+        } else if (challengeMode) {
+            document.querySelector('#stats p:first-child').classList.add('hidden');
+            document.querySelector('#stats p:nth-child(2)').classList.add('hidden');
+            challengeStats.classList.remove('hidden');
+            foundSets = [];
         } else {
-            document.querySelector('#stats p:first-child').classList.remove('hidden');
             timeLeft = 30;
             timerSpan.textContent = timeLeft;
             timer = setInterval(updateTimer, 1000);
@@ -66,22 +83,78 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function dealInitialCards() {
-        console.log("Dealing initial cards...");
-        const seed = seedInput.value;
-        const response = await fetch('/api/v1/deal_cards', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ n_cards: 9, seed: seed ? parseInt(seed) : null })
-        });
-        const data = await response.json();
-        if (data.ok) {
-            console.log("Initial cards received:", data.cards);
-            dealtCards = data.cards;
-            renderCards();
-            await findAndStoreHint();
+    async function dealInitialCards(overrideSeed = false) {
+        console.log("Dealing initial cards with seed:", seedInput.value);
+        let seed = seedInput.value;
+
+        if (!seed) {
+            seed = Math.floor(Math.random() * 1000000).toString(); // Generate
+            console.log("No seed provided, generating random seed:", seed);
+        }
+        if (overrideSeed) {
+            seed = overrideSeed;
+        }
+        
+        // Keep dealing new sets of 9 cards in challenge mode until we find one with a set
+        let hasSet = false;
+        let nTries = 0;
+        while (challengeMode && !hasSet) {
+            nTries++;
+            if (nTries !== 1) {
+                seed = seed + "" + nTries; // Append try number to seed for uniqueness
+            }
+            const response = await fetch('/api/v1/deal_cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ n_cards: 9, seed: seed})
+            });
+            const data = await response.json();
+            if (data.ok) {
+                console.log("Initial cards received:", data.cards);
+                dealtCards = data.cards;
+                
+                // Check if there's a set in these cards
+                const setResponse = await fetch('/api/v1/find_set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(dealtCards)
+                });
+                const setData = await setResponse.json();
+                hasSet = setData.ok;
+                
+                if (!hasSet) {
+                    console.log("No set found in initial cards, dealing new set...");
+                    // Generate a new random seed for next attempt
+                    seed = Math.floor(Math.random() * 1000000).toString();
+                }
+            } else {
+                console.error("Failed to deal initial cards:", data.message);
+                return;
+            }
+        }
+
+        // For non-challenge mode or once we have a valid set
+        if (!challengeMode) {
+            const response = await fetch('/api/v1/deal_cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ n_cards: 9, seed: seed})
+            });
+            const data = await response.json();
+            if (data.ok) {
+                console.log("Initial cards received:", data.cards);
+                dealtCards = data.cards;
+            } else {
+                console.error("Failed to deal initial cards:", data.message);
+                return;
+            }
+        }
+
+        renderCards();
+        if (challengeMode) {
+            await fetchAllSets();
         } else {
-            console.error("Failed to deal initial cards:", data.message);
+            await findAndStoreHint();
         }
     }
 
@@ -191,8 +264,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (data.ok) {
             console.log("Set is valid.");
-            score++;
-            scoreSpan.textContent = score;
+            if (challengeMode) {
+                const sortedSet = cardsToCheck.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+                const setString = JSON.stringify(sortedSet);
+                if (!foundSets.includes(setString)) {
+                    foundSets.push(setString);
+                    setsFoundSpan.textContent = foundSets.length;
+                    document.querySelectorAll('.card.selected').forEach(c => c.classList.add('found'));
+                    if (foundSets.length === allSets.length) {
+                        setTimeout(endGame, 500);
+                    }
+                }
+            } else {
+                score++;
+                scoreSpan.textContent = score;
+            }
             await replaceCards(cardsToCheck);
         } else {
             console.error("Set is invalid:", data.message);
@@ -218,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 await dealExtraCards();
             } else {
                 alert("No set found in 12 cards. Dealing a new game.");
-                await dealInitialCards();
+                await dealInitialCards(seedInput.value + "" + Math.floor(Math.random() * 1000));
             }
         }
     }
@@ -259,8 +345,32 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function fetchAllSets() {
+        console.log("Fetching all sets...");
+        const response = await fetch('/api/v1/find_all_sets', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(dealtCards)
+        });
+        const data = await response.json();
+        if (data.ok) {
+            allSets = data.sets.map(s => JSON.stringify(s.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))));
+            setsTotalSpan.textContent = allSets.length;
+            setsFoundSpan.textContent = 0;
+        } else {
+            console.error("Failed to fetch all sets:", data.message);
+        }
+    }
+
     async function replaceCards(cardsToReplace) {
         console.log("Replacing cards...");
+
+        if (challengeMode) {
+            // In challenge mode, cards are not replaced
+            document.querySelectorAll('.card.selected').forEach(c => c.classList.remove('selected'));
+            selectedCards = [];
+            return;
+        }
 
         if (dealtCards.length > 9) {
             dealtCards = dealtCards.filter(card => !cardsToReplace.find(c => JSON.stringify(c) === JSON.stringify(card)));
@@ -314,7 +424,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function endGame() {
         console.log("Game over.");
         gameBoardDiv.classList.add('hidden');
-        if (infiniteMode) {
+        if (challengeMode) {
+            alert("Congratulations! You found all the sets!");
+            setupDiv.classList.remove('hidden');
+        } else if (infiniteMode) {
             setupDiv.classList.remove('hidden');
         } else {
             gameOverModal.classList.remove('hidden');

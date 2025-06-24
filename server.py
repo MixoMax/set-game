@@ -124,6 +124,22 @@ async def find_set(cards: list[SetCard]):
 
     return JSONResponse(status_code=404, content={"message": "No set found in the provided cards.", "ok": False})
 
+
+@app.post("/api/v1/find_all_sets")
+async def find_all_sets(cards: list[SetCard]):
+    if len(cards) < N_CARDS_PER_SET:
+        return JSONResponse(status_code=400, content={"message": f"At least {N_CARDS_PER_SET} cards must be provided."})
+
+    found_sets = []
+    for combo in itertools.combinations(cards, N_CARDS_PER_SET):
+        if is_valid_set(list(combo)):
+            # Sort cards to have a canonical representation for each set
+            sorted_combo = sorted(list(combo), key=lambda c: c.to_tuple())
+            found_sets.append([card.dict() for card in sorted_combo])
+
+    return JSONResponse(status_code=200, content={"sets": found_sets, "ok": True})
+
+
 @app.get("/{path:path}")
 async def serve_file(path: str):
     if path == "":
