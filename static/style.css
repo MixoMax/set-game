@@ -81,7 +81,7 @@ button:active {
 
 #card-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 20px;
     padding: 20px;
     background: #fff;
@@ -140,12 +140,15 @@ button:active {
     box-shadow: 5px 5px 0 #1a1a1a;
 }
 
-#card-grid.four-columns {
-    grid-template-columns: repeat(4, 1fr);
+#card-grid.five-columns {
+    grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(3, 1fr);
 }
 
 @media (max-width: 800px) {
+    #card-grid.five-columns {
+        grid-template-columns: repeat(4, 1fr);
+    }
     #game-container {
         padding: 20px;
         width: 95%;
@@ -212,7 +215,7 @@ button:active {
         padding: 10px;
     }
 
-    #card-grid, #card-grid.four-columns {
+    #card-grid, #card-grid.five-columns {
         grid-template-columns: repeat(4, 1fr);
     }
 
@@ -253,7 +256,7 @@ button:active {
 }
 
 @media (max-width: 400px) {
-    #card-grid, #card-grid.four-columns {
+    #card-grid, #card-grid.five-columns {
         grid-template-columns: repeat(3, 1fr);
     }
 }

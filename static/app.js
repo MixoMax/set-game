@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/v1/deal_cards', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ n_cards: 9, seed: seed})
+                body: JSON.stringify({ n_cards: 12, seed: seed})
             });
             const data = await response.json();
             if (data.ok) {
@@ -153,7 +153,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const response = await fetch('/api/v1/deal_cards', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ n_cards: 9, seed: seed})
+                body: JSON.stringify({ n_cards: 12, seed: seed})
             });
             const data = await response.json();
             if (data.ok) {
@@ -176,7 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCards() {
         console.log("Rendering cards...");
         cardGrid.innerHTML = '';
-        if (dealtCards.length > 9) {
+        if (dealtCards.length > 12) {
             cardGrid.classList.add('four-columns');
         } else {
             cardGrid.classList.remove('four-columns');
@@ -315,10 +315,10 @@ document.addEventListener('DOMContentLoaded', () => {
             hintSet = data.set;
         } else {
             hintSet = null;
-            if (dealtCards.length < 12) {
+            if (dealtCards.length < 15) {
                 await dealExtraCards();
             } else {
-                showMsg("No set found in 12 cards. Dealing a new game.");
+                showMsg("No set found in 15 cards. Dealing a new game.");
                 await dealInitialCards(seedInput.value + "" + Math.floor(Math.random() * 1000));
             }
         }
@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (dealtCards.length > 9) {
+        if (dealtCards.length > 12) {
             dealtCards = dealtCards.filter(card => !cardsToReplace.find(c => JSON.stringify(c) === JSON.stringify(card)));
             renderCards();
             await findAndStoreHint();

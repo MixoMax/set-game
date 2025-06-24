@@ -15,7 +15,7 @@ LEADERBOARD_FILE = "leaderboard.json"
 N_DIMS = 4
 N_VARS_PER_DIM = 3
 N_CARDS_PER_SET = 3
-N_CARDS_TO_DEAL = 9
+N_CARDS_TO_DEAL = 12
 
 class SetCard(BaseModel):
     color_val: int
