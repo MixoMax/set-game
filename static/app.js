@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Error dialog elements
+    const errorContent = document.querySelector('.error-content');
     const errorDialog = document.getElementById('error-dialog');
     const errorMessage = document.querySelector('.error-message');
     const errorCloseBtn = document.querySelector('.error-close-btn');
@@ -10,8 +11,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function showMsg(message, color = 'red') {
         errorMessage.textContent = message;
-        errorMessage.style.color = color;
         errorDialog.classList.remove('hidden');
+
+        errorMessage.style.color = color;
+        errorCloseBtn.style.backgroundColor = color;
+        
+        // change border-left color of errorContent
+        errorContent.style.borderLeftColor = color;
     }
 
     const seedInput = document.getElementById('seed-input');
