@@ -79,6 +79,11 @@ button:active {
     background: linear-gradient(145deg, #ffd700, #ffa500);
 }
 
+#game-area {
+    display: flex;
+    gap: 20px;
+}
+
 #card-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -87,6 +92,51 @@ button:active {
     background: #fff;
     border: 2px solid #000;
     box-shadow: inset 3px 3px 6px rgba(0,0,0,0.2);
+}
+
+#challenge-sets-container {
+    width: 250px;
+    padding: 15px;
+    background: #fff;
+    border: 2px solid #000;
+    box-shadow: inset 2px 2px 5px rgba(0,0,0,0.2);
+}
+
+#all-sets-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.set-item {
+    display: flex;
+    gap: 5px;
+    padding: 5px;
+    border: 2px solid #ccc;
+    background-color: #f0f0f0;
+}
+
+.set-item.found {
+    background-color: #e0ffe0;
+    border-color: #32cd32;
+}
+
+.set-item .card {
+    width: 50px;
+    height: 75px;
+    padding: 2px;
+    box-shadow: none;
+    border-width: 2px;
+}
+
+.set-item .card svg {
+    height: 20px !important;
+}
+
+.set-item .card.hidden-card {
+    background: #ccc;
 }
 
 .card {
@@ -134,18 +184,21 @@ button:active {
     box-shadow: 5px 5px 0 #1a1a1a;
 }
 
-.card.found {
-    border-color: #32cd32;
-    background: linear-gradient(145deg, #32cd32, #228b22);
-    box-shadow: 5px 5px 0 #1a1a1a;
-}
-
 #card-grid.five-columns {
     grid-template-columns: repeat(5, 1fr);
     grid-template-rows: repeat(3, 1fr);
 }
 
 @media (max-width: 800px) {
+    #game-area {
+        flex-direction: column;
+    }
+
+    #challenge-sets-container {
+        width: auto;
+        max-height: 200px;
+    }
+
     #card-grid.five-columns {
         grid-template-columns: repeat(4, 1fr);
     }

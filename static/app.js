@@ -32,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const submitScoreButton = document.getElementById('submit-score-button');
     const leaderboardList = document.getElementById('leaderboard-list');
     const hintButton = document.getElementById('hint-button');
+    const challengeSetsContainer = document.getElementById('challenge-sets-container');
+    const allSetsList = document.getElementById('all-sets-list');
 
     let timer;
     let score = 0;
@@ -68,9 +70,9 @@ document.addEventListener('DOMContentLoaded', () => {
         score = 0;
         scoreSpan.textContent = score;
         challengeStats.classList.add('hidden');
+        challengeSetsContainer.classList.add('hidden');
         document.querySelector('#stats p:first-child').classList.remove('hidden');
         document.querySelector('#stats p:nth-child(2)').classList.remove('hidden');
-
 
         if (infiniteMode) {
             document.querySelector('#stats p:first-child').classList.add('hidden');
@@ -79,6 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelector('#stats p:first-child').classList.add('hidden');
             document.querySelector('#stats p:nth-child(2)').classList.add('hidden');
             challengeStats.classList.remove('hidden');
+            challengeSetsContainer.classList.remove('hidden');
             foundSets = [];
         } else {
             timeLeft = 30;
@@ -173,6 +176,69 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function createCardElement(card, cardIndex = 0) {
+        const cardElement = document.createElement('div');
+        cardElement.classList.add('card');
+        cardElement.dataset.card = JSON.stringify(card);
+        
+        const color = colors[card.color_val];
+        const shading = shadings[card.shading_val];
+
+        const getShapePath = (shape_val) => {
+            switch(shape_val) {
+                // Oval
+                case 0: return `<ellipse cx="50" cy="50" rx="40" ry="25"/>`;
+                // Triangle shape
+                case 1: return `<polygon points="50,10 90,90 10,90"/>`;
+                // Rectangle
+                case 2: return `<rect x="2.5" y="30" width="95" height="40"/>`;
+                default: return '';
+            }
+        }
+        
+        let shapeHTML = getShapePath(card.shape_val);
+        let defsHTML = '';
+        let fill_attr, stroke_attr, stroke_width_attr;
+
+        if (shading === 'solid') {
+            fill_attr = color;
+            stroke_attr = 'none';
+            stroke_width_attr = '0';
+        } else if (shading === 'striped') {
+            const patternId = `pattern-${card.color_val}-${card.shading_val}-${card.shape_val}-${card.number_val}-${cardIndex}`;
+            defsHTML = `
+                <defs>
+                    <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="6" height="6">
+                        <circle cx="2" cy="2" r="1.2" fill="${color}" />
+                    </pattern>
+                </defs>`;
+            fill_attr = `url(#${patternId})`;
+            stroke_attr = color;
+            stroke_width_attr = '4';
+        } else { // open
+            fill_attr = 'none';
+            stroke_attr = color;
+            stroke_width_attr = '4.5';
+        }
+
+        shapeHTML = shapeHTML.replace('/>', ` fill="${fill_attr}" stroke="${stroke_attr}" stroke-width="${stroke_width_attr}" />`);
+
+        const symbolSvg = `
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
+                ${defsHTML}
+                ${shapeHTML}
+            </svg>`;
+
+        const content = [];
+        for (let i = 0; i <= card.number_val; i++) {
+            content.push(symbolSvg);
+        }
+
+        cardElement.classList.add(`count-${content.length}`);
+        cardElement.innerHTML = content.join('');
+        return cardElement;
+    }
+
     function renderCards() {
         console.log("Rendering cards...");
         cardGrid.innerHTML = '';
@@ -183,66 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     
         dealtCards.forEach((card, cardIndex) => {
-            const cardElement = document.createElement('div');
-            cardElement.classList.add('card');
-            cardElement.dataset.card = JSON.stringify(card);
-            
-            const color = colors[card.color_val];
-            const shading = shadings[card.shading_val];
-    
-            const getShapePath = (shape_val) => {
-                switch(shape_val) {
-                    // Oval
-                    case 0: return `<ellipse cx="50" cy="50" rx="40" ry="25"/>`;
-                    // Triangle shape
-                    case 1: return `<polygon points="50,10 90,90 10,90"/>`;
-                    // Rectangle
-                    case 2: return `<rect x="2.5" y="30" width="95" height="40"/>`;
-                    default: return '';
-                }
-            }
-            
-            let shapeHTML = getShapePath(card.shape_val);
-            let defsHTML = '';
-            let fill_attr, stroke_attr, stroke_width_attr;
-    
-            if (shading === 'solid') {
-                fill_attr = color;
-                stroke_attr = 'none';
-                stroke_width_attr = '0';
-            } else if (shading === 'striped') {
-                const patternId = `pattern-${cardIndex}`;
-                defsHTML = `
-                    <defs>
-                        <pattern id="${patternId}" patternUnits="userSpaceOnUse" width="6" height="6">
-                            <circle cx="2" cy="2" r="1.2" fill="${color}" />
-                        </pattern>
-                    </defs>`;
-                fill_attr = `url(#${patternId})`;
-                stroke_attr = color;
-                stroke_width_attr = '4';
-            } else { // open
-                fill_attr = 'none';
-                stroke_attr = color;
-                stroke_width_attr = '4.5';
-            }
-    
-            shapeHTML = shapeHTML.replace('/>', ` fill="${fill_attr}" stroke="${stroke_attr}" stroke-width="${stroke_width_attr}" />`);
-    
-            const symbolSvg = `
-                <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">
-                    ${defsHTML}
-                    ${shapeHTML}
-                </svg>`;
-    
-            const content = [];
-            for (let i = 0; i <= card.number_val; i++) {
-                content.push(symbolSvg);
-            }
-
-            cardElement.classList.add(`count-${content.length}`);
-            cardElement.innerHTML = content.join('');
-    
+            const cardElement = createCardElement(card, cardIndex);
             cardElement.addEventListener('click', () => selectCard(cardElement));
             cardGrid.appendChild(cardElement);
         });
@@ -285,7 +292,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!foundSets.includes(setString)) {
                     foundSets.push(setString);
                     setsFoundSpan.textContent = foundSets.length;
-                    document.querySelectorAll('.card.selected').forEach(c => c.classList.add('found'));
+                    
+                    const setIndex = allSets.findIndex(s => s === setString);
+                    if (setIndex > -1) {
+                        const setItem = document.getElementById(`set-item-${setIndex}`);
+                        setItem.classList.add('found');
+                        setItem.innerHTML = ''; // Clear placeholder
+                        sortedSet.forEach((card, cardIndex) => {
+                            const cardElement = createCardElement(card, `set-${setIndex}-${cardIndex}`);
+                            setItem.appendChild(cardElement);
+                        });
+                    }
+
                     if (foundSets.length === allSets.length) {
                         setTimeout(endGame, 500);
                     }
@@ -374,6 +392,18 @@ document.addEventListener('DOMContentLoaded', () => {
             allSets = data.sets.map(s => JSON.stringify(s.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)))));
             setsTotalSpan.textContent = allSets.length;
             setsFoundSpan.textContent = 0;
+            allSetsList.innerHTML = '';
+            allSets.forEach((set, index) => {
+                const setItem = document.createElement('div');
+                setItem.classList.add('set-item');
+                setItem.id = `set-item-${index}`;
+                for (let i = 0; i < 3; i++) {
+                    const hiddenCard = document.createElement('div');
+                    hiddenCard.classList.add('card', 'hidden-card');
+                    setItem.appendChild(hiddenCard);
+                }
+                allSetsList.appendChild(setItem);
+            });
         } else {
             console.error("Failed to fetch all sets:", data.message);
         }
