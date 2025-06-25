@@ -5,7 +5,7 @@ This is a digital adaptation of the card game "Set". The game consists of a deck
 ## Game modes:
 - Time challenge: Find as many sets as possible within a given time limit.
 - Infinite mode: Play without a time limit, focusing on finding sets at your own pace.
-- Challenge mode: Find all sets in a given layout. (WIP, not yet implemented: for this, we need an API route to get ALL sets in a given layout)
+- Challenge mode: Find all sets in a given layout.
 
 ## How to play:
 1. Start the game and select a mode.
@@ -18,4 +18,13 @@ This is a digital adaptation of the card game "Set". The game consists of a deck
 ## Features:
 - Leaderboard
 - seeded runs
-- auto-detection of sets: re-deal 9 cards if the 9 cards on the board do not contain a set
+- auto-detection of sets: re-deal 12 cards if the 12 cards on the board do not contain a set
+  
+
+## TODO:
+- [ ] Change the /api/v1/is_set endpoint to return why the given cards are not a set and display that information in the UI
+- [ ] Nerf the "Hint" button
+- [ ] Fix the layout for when there are 15 cards on the board (right now: 3 rows of 4 cards and 1 row of 3 cards; should be 5 rows of 3 cards)
+- [ ] Add a better "Start game" Menu
+- [ ] encode the game state (game mode, seed, excluded cards and cards on the board) in the URL
+- [ ] Add a "Back" button to the game screen to return to the main menu
