@@ -17,6 +17,8 @@ N_VARS_PER_DIM = 3
 N_CARDS_PER_SET = 3
 N_CARDS_TO_DEAL = 12
 
+DIM_NAMES = ["color", "shape", "number", "shading"]
+
 class SetCard(BaseModel):
     color_val: int
     shape_val: int
@@ -54,21 +56,22 @@ def save_leaderboard_data(leaderboard: list[Score]):
     with open(LEADERBOARD_FILE, "w") as f:
         json.dump([item.dict() for item in leaderboard], f, indent=4)
 
-def is_valid_set(cards: list[SetCard]) -> bool:
+def is_valid_set(cards: list[SetCard]) -> tuple[bool, str | None]:
     values = [card.to_tuple() for card in cards]
     for i in range(N_DIMS):
         dim_values = [value[i] for value in values]
         if not (all(v == dim_values[0] for v in dim_values) or len(set(dim_values)) == N_VARS_PER_DIM):
-            return False
-    return True
+            return False, f"The {DIM_NAMES[i]}s are not all the same or all different."
+    return True, None
 
 @app.post("/api/v1/is_set")
 async def is_set(cards: list[SetCard]):
     if len(cards) != N_CARDS_PER_SET:
         return JSONResponse(status_code=400, content={"message": f"Exactly {N_CARDS_PER_SET} cards must be provided."})
 
-    if not is_valid_set(cards):
-        return JSONResponse(status_code=400, content={"ok": False, "message": "The provided cards do not form a valid set."})
+    is_valid, reason = is_valid_set(cards)
+    if not is_valid:
+        return JSONResponse(status_code=400, content={"ok": False, "message": reason})
 
     return JSONResponse(status_code=200, content={"ok": True})
 
@@ -119,7 +122,7 @@ async def find_set(cards: list[SetCard]):
         return JSONResponse(status_code=400, content={"message": f"At least {N_CARDS_PER_SET} cards must be provided."})
 
     for combo in itertools.combinations(cards, N_CARDS_PER_SET):
-        if is_valid_set(list(combo)):
+        if is_valid_set(list(combo))[0]:
             return JSONResponse(status_code=200, content={"set": [card.dict() for card in combo], "ok": True})
 
     return JSONResponse(status_code=404, content={"message": "No set found in the provided cards.", "ok": False})
@@ -132,7 +135,7 @@ async def find_all_sets(cards: list[SetCard]):
 
     found_sets = []
     for combo in itertools.combinations(cards, N_CARDS_PER_SET):
-        if is_valid_set(list(combo)):
+        if is_valid_set(list(combo))[0]:
             # Sort cards to have a canonical representation for each set
             sorted_combo = sorted(list(combo), key=lambda c: c.to_tuple())
             found_sets.append([card.dict() for card in sorted_combo])

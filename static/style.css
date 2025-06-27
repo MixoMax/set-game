@@ -189,6 +189,11 @@ button:active {
     grid-template-rows: repeat(3, 1fr);
 }
 
+#card-grid.three-columns {
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(5, 1fr);
+}
+
 @media (max-width: 800px) {
     #game-area {
         flex-direction: column;
@@ -418,11 +423,20 @@ label {
     margin-bottom: 20px;
 }
 
-#start-button {
+.mode-selection {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+}
+
+.start-button {
     background: linear-gradient(145deg, #32cd32, #228b22);
     color: white;
     text-shadow: 2px 2px #000;
     margin-top: 10px;
+    min-width: 100%;
 }
 
 h2, h3 {

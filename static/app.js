@@ -21,9 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const seedInput = document.getElementById('seed-input');
-    const infiniteModeCheckbox = document.getElementById('infinite-mode-checkbox');
-    const challengeModeCheckbox = document.getElementById('challenge-mode-checkbox');
-    const startButton = document.getElementById('start-button');
+    const startButtons = document.querySelectorAll('.start-button');
     const setupDiv = document.getElementById('setup');
     const gameBoardDiv = document.getElementById('game-board');
     const cardGrid = document.getElementById('card-grid');
@@ -56,20 +54,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const colors = ['red', 'purple', 'green'];
     const shadings = ['solid', 'striped', 'open'];
 
-    if (startButton) {
-        startButton.addEventListener('click', startGame);
-    } else {
-        console.error("Start button not found!");
-    }
+    startButtons.forEach(button => {
+        button.addEventListener('click', () => startGame(button.dataset.mode));
+    });
     submitScoreButton.addEventListener('click', submitScore);
     hintButton.addEventListener('click', getHint);
 
     console.log("Script loaded, event listeners attached.");
 
-    function startGame() {
+    function startGame(mode) {
         console.log("Starting game...");
-        infiniteMode = infiniteModeCheckbox.checked;
-        challengeMode = challengeModeCheckbox.checked;
+        infiniteMode = mode === 'infinite';
+        challengeMode = mode === 'challenge';
         setupDiv.classList.add('hidden');
         gameBoardDiv.classList.remove('hidden');
         gameOverModal.classList.add('hidden');
@@ -248,10 +244,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderCards() {
         console.log("Rendering cards...");
         cardGrid.innerHTML = '';
-        if (dealtCards.length > 12) {
+        if (dealtCards.length === 15) {
+            cardGrid.classList.add('three-columns');
+            cardGrid.classList.remove('four-columns');
+        } else if (dealtCards.length > 12) {
             cardGrid.classList.add('four-columns');
+            cardGrid.classList.remove('three-columns');
         } else {
             cardGrid.classList.remove('four-columns');
+            cardGrid.classList.remove('three-columns');
         }
     
         dealtCards.forEach((card, cardIndex) => {
@@ -370,9 +371,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function getHint() {
         if (hintSet) {
             console.log("Using stored hint:", hintSet);
+            const cardToHint = hintSet[Math.floor(Math.random() * hintSet.length)];
             document.querySelectorAll('.card').forEach(cardElement => {
                 const card = JSON.parse(cardElement.dataset.card);
-                if (hintSet.find(c => JSON.stringify(c) === JSON.stringify(card))) {
+                if (JSON.stringify(card) === JSON.stringify(cardToHint)) {
                     cardElement.classList.add('hint');
                 }
             });

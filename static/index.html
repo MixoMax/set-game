@@ -8,17 +8,13 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="setup">
+<div id="setup">
             <input type="text" id="seed-input" placeholder="Enter seed (optional)">
-            <div>
-                <input type="checkbox" id="infinite-mode-checkbox">
-                <label for="infinite-mode-checkbox">Infinite Mode</label>
+            <div class="mode-selection">
+                <button class="start-button" data-mode="time">Time Challenge</button>
+                <button class="start-button" data-mode="infinite">Infinite Mode</button>
+                <button class="start-button" data-mode="challenge">Challenge Mode</button>
             </div>
-            <div>
-                <input type="checkbox" id="challenge-mode-checkbox">
-                <label for="challenge-mode-checkbox">Challenge Mode</label>
-            </div>
-            <button id="start-button">Start Game</button>
         </div>
         <div id="game-board" class="hidden">
             <div id="game-controls">
