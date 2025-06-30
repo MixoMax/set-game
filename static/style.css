@@ -439,6 +439,13 @@ label {
     min-width: 100%;
 }
 
+#back-button-container {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 10;
+}
+
 h2, h3 {
     font-family: 'Press Start 2P', cursive;
     font-size: 1.2em;

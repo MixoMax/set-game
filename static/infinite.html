@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Set - Infinite Mode</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="back-button-container">
+        <button id="back-button"><-</button>
+    </div>
+    <div id="game-container">
+        <div id="game-board" class="hidden">
+            <div id="game-controls">
+                <div id="stats">
+                    <p>Score: <span id="score">0</span></p>
+                </div>
+                <button id="hint-button">Hint</button>
+            </div>
+            <div id="game-area">
+                <div id="card-grid"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="error-dialog" class="hidden">
+        <div class="modal-content error-content">
+            <p class="error-message"></p>
+            <button class="error-close-btn">OK</button>
+        </div>
+    </div>
+
+    <script src="app.js" type="module"></script>
+    <script src="infinite.js" type="module"></script>
+</body>
+</html>

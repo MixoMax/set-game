@@ -3,56 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Set</title>
+    <title>Set - Game Menu</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div id="game-container">
-<div id="setup">
+        <div id="setup">
             <input type="text" id="seed-input" placeholder="Enter seed (optional)">
+
+            <h1>Select a Game Mode</h1>
             <div class="mode-selection">
-                <button class="start-button" data-mode="time">Time Challenge</button>
-                <button class="start-button" data-mode="infinite">Infinite Mode</button>
-                <button class="start-button" data-mode="challenge">Challenge Mode</button>
-            </div>
-        </div>
-        <div id="game-board" class="hidden">
-            <div id="game-controls">
-                <div id="stats">
-                    <p>Time: <span id="timer">30</span>s</p>
-                    <p>Score: <span id="score">0</span></p>
-                    <p id="challenge-stats" class="hidden">Sets: <span id="sets-found">0</span> / <span id="sets-total">0</span></p>
-                </div>
-                <button id="hint-button">Hint</button>
-            </div>
-            <div id="game-area">
-                <div id="card-grid"></div>
-                <div id="challenge-sets-container" class="hidden">
-                    <h3>All Sets</h3>
-                    <div id="all-sets-list"></div>
-                </div>
+                <button onclick="document.location.href='timed.html?seed=' + document.getElementById('seed-input').value" class="start-button">Timed Mode</button>
+                <button onclick="document.location.href='infinite.html?seed=' + document.getElementById('seed-input').value" class="start-button">Infinite Mode</button>
+                <button onclick="document.location.href='challenge.html?seed=' + document.getElementById('seed-input').value" class="start-button">Challenge Mode</button>
+                <button onclick="document.location.href='balatro.html?seed=' + document.getElementById('seed-input').value" class="start-button">Balatro Mode</button>
             </div>
         </div>
     </div>
-
-    <div id="error-dialog" class="hidden">
-        <div class="modal-content error-content">
-            <p class="error-message"></p>
-            <button class="error-close-btn">OK</button>
-        </div>
-    </div>
-
-    <div id="game-over-modal" class="hidden">
-        <div class="modal-content">
-            <h2>Game Over!</h2>
-            <p>Your score: <span id="final-score">0</span></p>
-            <input type="text" id="name-input" placeholder="Enter your name">
-            <button id="submit-score-button">Submit Score</button>
-            <h3>Leaderboard</h3>
-            <ul id="leaderboard-list"></ul>
-        </div>
-    </div>
-
-    <script src="app.js"></script>
 </body>
 </html>
