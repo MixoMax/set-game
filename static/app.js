@@ -38,6 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const hintButton = document.getElementById('hint-button');
     const challengeSetsContainer = document.getElementById('challenge-sets-container');
     const allSetsList = document.getElementById('all-sets-list');
+    const backButton = document.getElementById('back-button');
 
     let timer;
     let score = 0;
@@ -59,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     submitScoreButton.addEventListener('click', submitScore);
     hintButton.addEventListener('click', getHint);
+    backButton.addEventListener('click', backToMenu);
 
     console.log("Script loaded, event listeners attached.");
 
@@ -514,6 +516,12 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ name, score })
         });
         gameOverModal.classList.add('hidden');
+        setupDiv.classList.remove('hidden');
+    }
+
+    function backToMenu() {
+        console.log("Game aborted.");
+        gameBoardDiv.classList.add('hidden');
         setupDiv.classList.remove('hidden');
     }
 });
