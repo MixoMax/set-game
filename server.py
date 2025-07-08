@@ -1,3 +1,4 @@
+from collections import Counter
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
 from pydantic import BaseModel
@@ -59,8 +60,8 @@ def save_leaderboard_data(leaderboard: list[Score]):
 def is_valid_set(cards: list[SetCard]) -> tuple[bool, str | None]:
     values = [card.to_tuple() for card in cards]
     for i in range(N_DIMS):
-        dim_values = [value[i] for value in values]
-        if not (all(v == dim_values[0] for v in dim_values) or len(set(dim_values)) == N_VARS_PER_DIM):
+        dim_values = Counter([value[i] for value in values])
+        if not (len(dim_values) == 1 or (len(dim_values) + dim_values.get(-1, 1) - 1) == N_VARS_PER_DIM):
             return False, f"The {DIM_NAMES[i]}s are not all the same or all different."
     return True, None
 
