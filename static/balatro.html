@@ -12,7 +12,17 @@
         <a href="/"><button id="back-button"><-</button></a>
     </div>
 
-    <div id="game-container">
+    <div id="lobby-container">
+        <h1>Balatro Runs</h1>
+        <ul id="saves-list">
+            <!-- Saved games will be listed here -->
+        </ul>
+        <div id="lobby-controls">
+            <button id="lobby-new-run-button">New Run</button>
+        </div>
+    </div>
+
+    <div id="game-container" style="display: none;">
         <div id="game-info">
             <div id="money">Money: $<span id="money-value">0</span></div>
             <div id="ante-info">Ante <span id="ante-value">1</span></div>
@@ -52,8 +62,8 @@
             </div>
         </div>
         
-        <div id="new-run-container">
-             <button id="new-run-button">New Run</button>
+        <div id="end-run-container" style="display: none;">
+             <button id="return-to-lobby-button">Back to Lobby</button>
         </div>
 
         <div id="scoring-display" class="hidden">

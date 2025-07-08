@@ -3,9 +3,10 @@ import { showMsg, createCardElement } from './app.js';
 const API_BASE = '/api/balatro';
 
 const api = {
+    getSaves: () => fetch(`${API_BASE}/saves`).then(res => res.json()),
     newRun: () => fetch(`${API_BASE}/new_run`, { method: 'POST' }).then(res => res.json()),
-    getState: () => fetch(`${API_BASE}/state`).then(res => res.json()),
-    playSet: (card_indices) => fetch(`${API_BASE}/play_set`, {
+    getState: (id) => fetch(`${API_BASE}/state?id=${id}`).then(res => res.json()),
+    playSet: (id, card_indices) => fetch(`${API_BASE}/play_set?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_indices })
@@ -16,7 +17,7 @@ const api = {
         }
         return res.json();
     }),
-    discard: (card_indices) => fetch(`${API_BASE}/discard`, {
+    discard: (id, card_indices) => fetch(`${API_BASE}/discard?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ card_indices })
@@ -26,8 +27,8 @@ const api = {
         }
         return res.json();
     }),
-    leaveShop: () => fetch(`${API_BASE}/leave_shop`, { method: 'POST' }).then(res => res.json()),
-    buyJoker: (slot_index) => fetch(`${API_BASE}/buy_joker`, {
+    leaveShop: (id) => fetch(`${API_BASE}/leave_shop?id=${id}`, { method: 'POST' }).then(res => res.json()),
+    buyJoker: (id, slot_index) => fetch(`${API_BASE}/buy_joker?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot_index })
@@ -37,7 +38,7 @@ const api = {
         }
         return res.json();
     }),
-    buyBoosterPack: (slot_index) => fetch(`${API_BASE}/buy_booster_pack`, {
+    buyBoosterPack: (id, slot_index) => fetch(`${API_BASE}/buy_booster_pack?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slot_index })
@@ -47,7 +48,7 @@ const api = {
         }
         return res.json();
     }),
-    choosePackReward: (selected_ids) => fetch(`${API_BASE}/choose_pack_reward`, {
+    choosePackReward: (id, selected_ids) => fetch(`${API_BASE}/choose_pack_reward?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ selected_ids })
@@ -57,7 +58,7 @@ const api = {
         }
         return res.json();
     }),
-    useConsumable: (consumable_index, target_card_indices = []) => fetch(`${API_BASE}/use_consumable`, {
+    useConsumable: (id, consumable_index, target_card_indices = []) => fetch(`${API_BASE}/use_consumable?id=${id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ consumable_index, target_card_indices })
@@ -67,12 +68,25 @@ const api = {
         }
         return res.json();
     }),
+    reorderJokers: (id, new_order) => fetch(`${API_BASE}/reorder_jokers?id=${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_order })
+    }).then(res => {
+        if (!res.ok) {
+            return res.json().then(err => { throw new Error(err.detail || "Server error") });
+        }
+        return res.json();
+    }),
 };
+
+let draggedJokerIndex = null;
 
 const state = {
     selectedCards: new Set(),
     selectedPackChoices: new Set(),
     game: null,
+    gameId: null,
 };
 
 const DOMElements = {
@@ -88,10 +102,14 @@ const DOMElements = {
     discardsRemaining: document.getElementById('discards-remaining'),
     playSetButton: document.getElementById('play-set-button'),
     discardButton: document.getElementById('discard-button'),
-    newRunButton: document.getElementById('new-run-button'),
+    lobbyNewRunButton: document.getElementById('lobby-new-run-button'),
     controls: document.getElementById('controls'),
     boardArea: document.getElementById('board-area'),
     gameContainer: document.getElementById('game-container'),
+    lobbyContainer: document.getElementById('lobby-container'),
+    savesList: document.getElementById('saves-list'),
+    endRunContainer: document.getElementById('end-run-container'),
+    returnToLobbyButton: document.getElementById('return-to-lobby-button'),
     scoringDisplay: document.getElementById('scoring-display'),
     shopOverlay: document.getElementById('shop-overlay'),
     shopItems: document.getElementById('shop-items'),
@@ -206,9 +224,11 @@ function renderCard(card, index) {
     return cardEl;
 }
 
-function renderJoker(joker) {
+function renderJoker(joker, index) {
     const jokerEl = document.createElement('div');
     jokerEl.classList.add('joker-card', joker.rarity.toLowerCase());
+    jokerEl.setAttribute('draggable', 'true');
+    jokerEl.dataset.index = index;
     
     const imageSrc = `/images/${joker.id}.webp`;
 
@@ -273,8 +293,8 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
 
     // Render Jokers
     DOMElements.jokerArea.innerHTML = '';
-    gameState.jokers.forEach(joker => {
-        const jokerEl = renderJoker(joker);
+    gameState.jokers.forEach((joker, index) => {
+        const jokerEl = renderJoker(joker, index);
         DOMElements.jokerArea.appendChild(jokerEl);
     });
 
@@ -314,14 +334,14 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
     if (gameState.game_phase === 'game_over') {
         showMsg("Game Over! You failed to meet the score.");
         DOMElements.controls.style.display = 'none';
-        DOMElements.newRunButton.parentElement.style.display = 'block';
+        DOMElements.endRunContainer.style.display = 'block';
         return;
     }
     
     if (gameState.game_phase === 'run_won') {
         showMsg("Congratulations! You won the run!");
         DOMElements.controls.style.display = 'none';
-        DOMElements.newRunButton.parentElement.style.display = 'block';
+        DOMElements.endRunContainer.style.display = 'block';
         return;
     }
 
@@ -418,7 +438,7 @@ async function playSet() {
 
     try {
         console.log("Calling api.playSet");
-        const { game_state: newState, scoring_details: scoringDetails } = await api.playSet(indices);
+        const { game_state: newState, scoring_details: scoringDetails } = await api.playSet(state.gameId, indices);
         console.log("api.playSet returned");
         state.selectedCards.clear();
 
@@ -455,7 +475,7 @@ async function discard() {
     const indices = Array.from(state.selectedCards);
 
     try {
-        const { game_state: newGameState } = await api.discard(indices);
+        const { game_state: newGameState } = await api.discard(state.gameId, indices);
         state.selectedCards.clear();
         updateUI(newGameState, oldState);
     } catch (error) {
@@ -470,13 +490,12 @@ async function discard() {
 
 async function startNewRun() {
     try {
-        const newGameState = await api.newRun();
-        updateUI(newGameState);
-        DOMElements.newRunButton.parentElement.style.display = 'none';
-        DOMElements.controls.style.display = 'flex';
-        DOMElements.boardArea.style.display = 'block';
-        DOMElements.shopOverlay.classList.add('hidden');
-
+        const newGame = await api.newRun();
+        if (newGame && newGame.id) {
+            await loadGame(newGame.id, newGame);
+        } else {
+            throw new Error("New run data is invalid.");
+        }
     } catch (error) {
         showMsg("Failed to start a new run.");
         console.error(error);
@@ -485,7 +504,7 @@ async function startNewRun() {
 
 async function handleLeaveShop() {
     try {
-        const { game_state: newGameState } = await api.leaveShop();
+        const { game_state: newGameState } = await api.leaveShop(state.gameId);
         updateUI(newGameState);
     } catch (error) {
         console.error("Error leaving shop:", error);
@@ -495,7 +514,7 @@ async function handleLeaveShop() {
 
 async function handleBuyJoker(slotIndex) {
     try {
-        const { game_state: newGameState } = await api.buyJoker(slotIndex);
+        const { game_state: newGameState } = await api.buyJoker(state.gameId, slotIndex);
         updateUI(newGameState); // This will re-render the shop with the updated state
     } catch (error) {
         console.error("Error buying joker:", error);
@@ -505,7 +524,7 @@ async function handleBuyJoker(slotIndex) {
 
 async function handleBuyBoosterPack(slotIndex) {
     try {
-        const { game_state: newGameState } = await api.buyBoosterPack(slotIndex);
+        const { game_state: newGameState } = await api.buyBoosterPack(state.gameId, slotIndex);
         updateUI(newGameState); // This will now trigger renderPackOpening
     } catch (error) {
         console.error("Error buying booster pack:", error);
@@ -530,7 +549,7 @@ async function handleUseConsumable(consumableIndex) {
     try {
         hideTooltip();
         // For consumables that don't need a target, indices will be an empty array, which is fine.
-        const { game_state: newGameState, message } = await api.useConsumable(consumableIndex, indices);
+        const { game_state: newGameState, message } = await api.useConsumable(state.gameId, consumableIndex, indices);
         if (message) showMsg(message);
         
         // Clear selection after successful use
@@ -627,7 +646,7 @@ function renderShop(gameState) {
 async function cancelTargeting() {
     try {
         // Just get the latest state from the server, which will have the correct phase
-        const newGameState = await api.getState();
+        const newGameState = await api.getState(state.gameId);
         updateUI(newGameState);
     } catch (error) {
         console.error("Error cancelling targeting:", error);
@@ -635,28 +654,169 @@ async function cancelTargeting() {
     }
 }
 
+function showLobby() {
+    DOMElements.gameContainer.style.display = 'none';
+    DOMElements.lobbyContainer.classList.remove('hidden');
+    DOMElements.endRunContainer.style.display = 'none';
+
+    api.getSaves().then(data => {
+        renderLobby(data.saves);
+    }).catch(err => {
+        console.error("Failed to fetch saves:", err);
+        showMsg("Could not connect to the server.");
+        DOMElements.savesList.innerHTML = '<p>Error loading saves.</p>';
+    });
+}
+
+async function loadGame(id, gameState = null) {
+    try {
+        state.gameId = id;
+        const gameToLoad = gameState || await api.getState(id);
+
+        DOMElements.lobbyContainer.classList.add('hidden');
+        DOMElements.gameContainer.style.display = 'flex';
+        DOMElements.endRunContainer.style.display = 'none';
+        
+        // Reset UI elements that might persist from previous games
+        DOMElements.controls.style.display = 'flex';
+        DOMElements.boardArea.style.display = 'block';
+        DOMElements.shopOverlay.classList.add('hidden');
+
+        updateUI(gameToLoad);
+    } catch (error) {
+        showMsg("Failed to load game.");
+        console.error(error);
+        showLobby(); // Go back to lobby on error
+    }
+}
+
+function renderLobby(saves) {
+    DOMElements.savesList.innerHTML = '';
+    if (!saves || saves.length === 0) {
+        DOMElements.savesList.innerHTML = '<li>No saved games found. Start a new run!</li>';
+        return;
+    }
+
+    saves.forEach(save => {
+        const saveEl = document.createElement('li');
+        saveEl.classList.add('save-game-entry');
+        saveEl.innerHTML = `
+            <div class="save-info">
+                <span class="save-id">ID: ${save.id.substring(0, 8)}</span>
+                <span class="save-ante">Ante: ${save.ante || 1}</span>
+                <span class="save-blind">Blind: ${save.current_blind || 'N/A'}</span>
+                <span class="save-phase">Phase: ${save.game_phase}</span>
+            </div>
+            <button class="continue-button">Continue</button>
+        `;
+        saveEl.querySelector('.continue-button').addEventListener('click', () => loadGame(save.id));
+        DOMElements.savesList.appendChild(saveEl);
+    });
+}
+
 function init() {
-    DOMElements.newRunButton.addEventListener('click', startNewRun);
+    DOMElements.lobbyNewRunButton.addEventListener('click', startNewRun);
+    DOMElements.returnToLobbyButton.addEventListener('click', showLobby);
     DOMElements.playSetButton.addEventListener('click', playSet);
     DOMElements.discardButton.addEventListener('click', discard);
     DOMElements.closeShopButton.addEventListener('click', handleLeaveShop);
     DOMElements.cancelTargetingButton.addEventListener('click', cancelTargeting);
     DOMElements.confirmPackChoiceButton.addEventListener('click', handleConfirmPackChoice);
-    
-    DOMElements.controls.style.display = 'none';
-    DOMElements.boardArea.style.display = 'none';
 
-    api.getState().then(gameState => {
-        if (gameState) {
-            updateUI(gameState);
-            if (gameState.game_phase === 'playing' || gameState.game_phase === 'shop') {
-                 DOMElements.newRunButton.parentElement.style.display = 'none';
-            }
-        }
-    }).catch(() => {
-        DOMElements.newRunButton.parentElement.style.display = 'block';
-    });
+    DOMElements.jokerArea.addEventListener('dragstart', handleJokerDragStart);
+    DOMElements.jokerArea.addEventListener('dragover', handleJokerDragOver);
+    DOMElements.jokerArea.addEventListener('dragleave', handleJokerDragLeave);
+    DOMElements.jokerArea.addEventListener('drop', handleJokerDrop);
+    DOMElements.jokerArea.addEventListener('dragend', handleJokerDragEnd);
+    
+    showLobby();
 }
+
+function handleJokerDragStart(event) {
+    const target = event.target.closest('.joker-card');
+    if (target) {
+        draggedJokerIndex = parseInt(target.dataset.index, 10);
+        event.dataTransfer.effectAllowed = 'move';
+        // Add a class for styling the dragged element
+        setTimeout(() => {
+            target.classList.add('dragging');
+        }, 0);
+    }
+}
+
+function handleJokerDragOver(event) {
+    event.preventDefault();
+    const container = DOMElements.jokerArea;
+    const activeItem = container.querySelector('.dragging');
+    if (!activeItem) return;
+
+    const overElement = event.target.closest('.joker-card');
+    
+    // Find all non-dragging items
+    const siblings = [...container.querySelectorAll('.joker-card:not(.dragging)')];
+
+    // Find the sibling the cursor is over
+    const nextSibling = siblings.find(sibling => {
+        const rect = sibling.getBoundingClientRect();
+        // Check if the cursor is in the left half of the sibling
+        return event.clientX < rect.left + rect.width / 2;
+    });
+
+    // Insert the active item before the identified sibling or at the end
+    if (nextSibling) {
+        container.insertBefore(activeItem, nextSibling);
+    } else {
+        container.appendChild(activeItem);
+    }
+}
+
+function handleJokerDragLeave(event) {
+    // This can help remove styles if the user drags out of the container
+}
+
+function handleJokerDragEnd(event) {
+    const target = event.target.closest('.joker-card');
+    if (target) {
+        target.classList.remove('dragging');
+    }
+    draggedJokerIndex = null;
+}
+
+async function handleJokerDrop(event) {
+    event.preventDefault();
+    if (draggedJokerIndex === null) return;
+
+    const jokerElements = [...DOMElements.jokerArea.querySelectorAll('.joker-card')];
+    const newOrder = jokerElements.map(j => parseInt(j.dataset.index, 10));
+
+    // The visual reordering is already done in dragOver.
+    // Now, we just need to send the final order to the backend.
+
+    // Clean up visual styles immediately
+    const draggedElement = jokerElements.find(j => parseInt(j.dataset.index, 10) === draggedJokerIndex);
+    if (draggedElement) {
+        draggedElement.classList.remove('dragging');
+    }
+    
+    draggedJokerIndex = null;
+
+    try {
+        // We don't need the response if it's just the same state
+        await api.reorderJokers(state.gameId, newOrder);
+        // The UI is already visually updated, so we just need to refresh the state
+        // in the background for consistency, or trust the visual update.
+        // For simplicity, we'll fetch the new state to be safe.
+        const newGameState = await api.getState(state.gameId);
+        updateUI(newGameState);
+
+    } catch (error) {
+        console.error("Error reordering jokers:", error);
+        showMsg(error.message || "Failed to reorder jokers.");
+        // Revert to original UI on failure by re-rendering the last known good state
+        updateUI(state.game);
+    }
+}
+
 
 function animateValue(element, from, to, duration = 400, isFloat = false) {
     return new Promise(resolve => {
@@ -699,6 +859,7 @@ function shakeSelectedCards() {
 }
 
 function createScorePopup(text, type, x, y) {
+    console.log("Creating score popup:", { text, type, x, y });
     const containerRect = DOMElements.gameContainer.getBoundingClientRect();
     const popup = document.createElement('div');
     popup.textContent = text;
@@ -956,7 +1117,7 @@ async function handleConfirmPackChoice() {
     DOMElements.confirmPackChoiceButton.disabled = true;
 
     try {
-        const { game_state: newGameState, message } = await api.choosePackReward(selectedIds);
+        const { game_state: newGameState, message } = await api.choosePackReward(state.gameId, selectedIds);
         if (message) showMsg(message);
         updateUI(newGameState);
     } catch (error) {

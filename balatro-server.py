@@ -10,10 +10,17 @@ import itertools
 from typing import List, Dict, Any, Optional, Callable
 from enum import Enum
 from collections import Counter
+from uuid import uuid4
 
 app = FastAPI()
 
-# --- Game Data ---
+if os.path.exists("balatro-saves.json"):
+    with open("balatro-saves.json", "r") as f:
+        GAME_SAVES = json.load(f)
+else:
+    GAME_SAVES = {}
+
+#%% --- Game Data ---
 
 class JokerTrigger(Enum):
     ON_SCORE_CALCULATION = "on_score_calculation"
@@ -92,7 +99,7 @@ class ConsumableCard(BaseModel):
     target_count: int = 0
 
 
-# --- Ability Implementations ---
+#%% --- Game Logic ---
 
 def enhance_selected_cards(ctx: GameContext, enhancement: str) -> int:
     """Helper function to enhance selected cards on board."""
@@ -263,7 +270,7 @@ JOKER_DATABASE = {
     "J_LAST_STAND": Joker(
         id="J_LAST_STAND",
         name="Last Stand",
-        description="x4 Mult on your final board of the round.",
+        description="x4 Mult on your final set of the round.",
         rarity="Uncommon",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 4) if ctx.game.boards_remaining == 1 else None)
@@ -432,7 +439,15 @@ TAROT_DATABASE = {
         target_count=1,
         abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_wheel_of_fortune_ability)]
     ),
-
+    "T_THE_HANGED_MAN": ConsumableCard(
+        id="T_THE_HANGED_MAN",
+        name="The Hanged Man",
+        description="Gain 1 extra turn.",
+        rarity="Rare",
+        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+            setattr(ctx.game, 'extra_turns', ctx.game.extra_turns + 1)
+        ))]
+    )
 }
 
 JOKER_RARITY_PRICES = {"Common": 4, "Uncommon": 6, "Rare": 8, "Legendary": 10}
@@ -486,6 +501,7 @@ class ShopState(BaseModel):
     booster_pack_slots: List[BoosterPack] = []
 
 class GameState(BaseModel):
+    id: str = ""
     deck: List[Card] = []
     board: List[Card] = []
     discard_pile: List[Card] = []
@@ -671,9 +687,10 @@ def trigger_consumable_abilities(game: GameState, consumable: ConsumableCard, tr
     for ability_def in abilities_to_run:
         ability_def.ability(consumable, game_ctx)
 
+#%% --- API Endpoints ---
+
 @app.post("/api/balatro/new_run", response_model=GameState)
 async def new_run():
-    global current_game
     deck_cards = [Card(attributes=attr) for attr in create_deck()]
     random.shuffle(deck_cards)
     current_game = GameState(
@@ -684,11 +701,19 @@ async def new_run():
     )
     current_game.board = deck_cards[:current_game.board_size]
     current_game.deck = deck_cards[current_game.board_size:]
+
+    uid = str(uuid4())
+    current_game.id = uid
+    GAME_SAVES[uid] = current_game
+
     return JSONResponse(content=current_game.model_dump())
 
 @app.get("/api/balatro/state")
-async def get_state():
-    if not current_game: raise HTTPException(status_code=404, detail="No game in progress. Start a new run.")
+async def get_state(id: str):
+    
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
     blind_info = get_current_blind_info(current_game)
     return {**current_game.model_dump(), "current_blind": blind_info["name"], "blind_score_required": blind_info["score_required"]}
 
@@ -696,8 +721,11 @@ class PlaySetRequest(BaseModel): card_indices: List[int]
 
 
 @app.post("/api/balatro/play_set")
-async def play_set(request: PlaySetRequest):
-    global current_game
+async def play_set(request: PlaySetRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+
     if not current_game or current_game.game_phase != "playing":
         raise HTTPException(status_code=400, detail="Not in a playing phase.")
     if len(request.card_indices) != 3:
@@ -890,8 +918,12 @@ async def play_set(request: PlaySetRequest):
 class DiscardRequest(BaseModel): card_indices: List[int]
 
 @app.post("/api/balatro/discard")
-async def discard(request: DiscardRequest):
-    global current_game
+async def discard(request: DiscardRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    
+    current_game = GAME_SAVES[id]
+
     if not current_game or current_game.game_phase != "playing": raise HTTPException(status_code=400, detail="Not in a playing phase.")
     if not (1 <= len(request.card_indices) <= 5): raise HTTPException(status_code=400, detail="Must select between 1 and 5 cards to discard.")
     if current_game.discards_remaining <= 0: raise HTTPException(status_code=400, detail="No discards remaining.")
@@ -920,8 +952,12 @@ async def discard(request: DiscardRequest):
 class BuyJokerRequest(BaseModel): slot_index: int
 
 @app.post("/api/balatro/buy_joker")
-async def buy_joker(request: BuyJokerRequest):
-    global current_game
+async def buy_joker(request: BuyJokerRequest, id: str):
+    
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+
     if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
     if len(current_game.jokers) >= current_game.joker_slots: raise HTTPException(status_code=400, detail="No empty joker slots.")
     slot_index = request.slot_index
@@ -938,8 +974,11 @@ async def buy_joker(request: BuyJokerRequest):
 class BuyBoosterRequest(BaseModel): slot_index: int
 
 @app.post("/api/balatro/buy_booster_pack")
-async def buy_booster_pack(request: BuyBoosterRequest):
-    global current_game
+async def buy_booster_pack(request: BuyBoosterRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+    
     if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
     slot_index = request.slot_index
     if not (0 <= slot_index < len(current_game.shop_state.booster_pack_slots)): raise HTTPException(status_code=400, detail="Invalid pack slot.")
@@ -996,8 +1035,10 @@ class ChoosePackRewardRequest(BaseModel):
     selected_ids: List[str]
 
 @app.post("/api/balatro/choose_pack_reward")
-async def choose_pack_reward(request: ChoosePackRewardRequest):
-    global current_game
+async def choose_pack_reward(request: ChoosePackRewardRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
     if not current_game or current_game.game_phase != "pack_opening":
         raise HTTPException(status_code=400, detail="Not in pack opening phase.")
     
@@ -1031,8 +1072,11 @@ class UseConsumableRequest(BaseModel):
     target_card_indices: Optional[List[int]] = None
 
 @app.post("/api/balatro/use_consumable")
-async def use_consumable(request: UseConsumableRequest):
-    global current_game
+async def use_consumable(request: UseConsumableRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+
     if not current_game or current_game.game_phase != "playing": raise HTTPException(status_code=400, detail="Can only use consumables during a round.")
     index = request.consumable_index
     if not (0 <= index < len(current_game.consumables)): raise HTTPException(status_code=400, detail="Invalid consumable index.")
@@ -1058,9 +1102,38 @@ async def use_consumable(request: UseConsumableRequest):
     
     return {"game_state": current_game.model_dump(), "message": game_ctx.consumable.message}
 
+class ReorderJokersRequest(BaseModel):
+    new_order: List[int]
+
+@app.post("/api/balatro/reorder_jokers")
+async def reorder_jokers(request: ReorderJokersRequest, id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+
+    if not current_game or current_game.game_phase not in ["playing", "shop"]:
+        raise HTTPException(status_code=400, detail="Can only reorder jokers during playing or shop phase.")
+
+    new_order_indices = request.new_order
+    jokers = current_game.jokers
+
+    if len(new_order_indices) != len(jokers) or set(new_order_indices) != set(range(len(jokers))):
+        raise HTTPException(status_code=400, detail="Invalid new order provided.")
+
+    reordered_jokers = [jokers[i] for i in new_order_indices]
+    current_game.jokers = reordered_jokers
+
+    # No need to return the full game state, just a success message is fine
+    # to reduce network traffic, but returning state is also okay.
+    return {"game_state": current_game.model_dump()}
+
+
 @app.post("/api/balatro/leave_shop")
-async def leave_shop():
-    global current_game
+async def leave_shop(id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+
     if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
     
     trigger_joker_abilities(current_game, JokerTrigger.END_OF_ROUND)
@@ -1110,15 +1183,31 @@ async def leave_shop():
     game_state_dict["blind_score_required"] = blind_info["score_required"]
     return {"game_state": game_state_dict}
 
+@app.get("/api/balatro/saves")
+async def get_saves():
+    blind_infos = []
+    for uid, game in GAME_SAVES.items():
+        blind_info = get_current_blind_info(game)
+        blind_infos.append({
+            "id": uid,
+            "current_blind": blind_info["name"],
+            "blind_score_required": blind_info["score_required"],
+            "round_score": game.round_score,
+            "game_phase": game.game_phase
+        })
+    return {"saves": blind_infos}
+
+
 @app.get("/{path:path}")
 async def serve_file(path: str):
-    if path == "" or path == "balatro": path = "balatro.html"
+    if path == "" or path == "balatro":
+        path = "balatro.html"
     file_path = os.path.join("static", path)
-    if os.path.exists(file_path): return FileResponse(file_path)
+
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
     else:
-        balatro_html_path = os.path.join("static", "balatro.html")
-        if os.path.exists(balatro_html_path): return FileResponse(balatro_html_path)
-        return JSONResponse(status_code=404, content={"message": "File not found"})
+        raise HTTPException(status_code=404, detail="File not found.")
 
 if __name__ == "__main__":
     port = 8001
