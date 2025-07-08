@@ -1,0 +1,38 @@
+- J_CHIPS -> Joker
+- J_MULT -> Droll Joker
+- J_XMULT -> Crazy joker
+- J_UNIFORM_CHIPS -> Greedy Joker
+- J_LADDER_MULT -> Crafty Joker
+- J_MONEY_MULT -> Midas Mask
+- J_DISCARD_MULT -> Throwback
+- J_ETERNAL_MULT -> Eternal
+- J_FULL_HOUSE -> Collector
+- J_SYNERGY_GREEN -> Green Synergy
+- J_SYNERGY_RED -> Red Synergy
+- J_PURPLE_CARD_MULT -> Purple Power
+- J_OVAL_BOOST -> Oval Enthusiast
+- J_SOLID_MULT -> Solidarity
+- J_ENHANCED_POWER -> Enhancement Amplifier
+- J_FIRST_CARD -> First Strike
+- J_JUGGLER -> The Juggler
+- J_SCAVANGER -> Scavenger
+- J_ALCHEMIST -> The Alchemist
+- J_LAST_STAND -> Last Stand
+- J_MIMIC -> The Mimic
+- J_GAMBLER -> Gambler
+- J_OBSERVATORY -> Observatory
+
+- T_THE_EMPRESS -> The Empress
+- T_THE_HIEROPHANT -> The Hierophant
+- T_THE_TOWER -> The Tower
+- T_THE_SUN -> The Sun
+- T_THE_WORLD -> The World
+- T_JUDGEMENT -> Judgement
+- T_THE_DEVIL -> The Devil
+- T_STRENGTH -> Strength
+- T_THE_FOOL -> The Fool
+- T_THE_HERMIT -> The Hermit
+- T_THE_LOVERS -> The Lovers
+- T_THE_CHARIOT -> The Chariot
+- T_THE_WHEEL_OF_FORTUNE -> The Wheel of Fortune
+- T_THE_HANGED_MAN -> The Hanged Man
