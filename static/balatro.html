@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Set - Balatro Mode</title>
+    <link rel="stylesheet" href="balatro-style.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="back-button-container">
+        <a href="/"><button id="back-button"><-</button></a>
+    </div>
+
+    <div id="lobby-container">
+        <h1>Balatro Runs</h1>
+        <ul id="saves-list">
+            <!-- Saved games will be listed here -->
+        </ul>
+        <div id="lobby-controls">
+            <button id="lobby-new-run-button">New Run</button>
+        </div>
+    </div>
+
+    <div id="game-container" style="display: none;">
+        <div id="game-info">
+            <div id="money">Money: $<span id="money-value">0</span></div>
+            <div id="ante-info">Ante <span id="ante-value">1</span></div>
+            <div id="blind-info">
+                <span id="blind-type">Small Blind</span>
+                <div id="boss-blind-effect-display" class="hidden">
+                    <span class="effect-title">Boss Effect:</span>
+                    <span id="boss-blind-effect-text"></span>
+                </div>
+                <div id="score-progress-container">
+                    <div id="score-progress-bar"></div>
+                    <span id="current-score">0</span> <span>/</span> <span id="required-score">300</span>
+                </div>
+            </div>
+        </div>
+        <div id="joker-area">
+            <!-- Joker cards will be added here -->
+        </div>
+        <div id="consumable-area">
+            <!-- Consumable cards will be added here -->
+        </div>
+
+        <div id="board-area">
+            <div id="card-grid">
+                <!-- Player's board of cards will be rendered here -->
+            </div>
+        </div>
+
+        <div id="controls">
+            <div class="board-info">
+                Boards: <span id="boards-remaining">4</span>
+            </div>
+            <button id="play-set-button" disabled>Play Set</button>
+            <button id="discard-button" disabled>Discard</button>
+            <div class="board-info">
+                Discards: <span id="discards-remaining">3</span>
+            </div>
+        </div>
+        
+        <div id="end-run-container" style="display: none;">
+             <button id="return-to-lobby-button">Back to Lobby</button>
+        </div>
+
+        <div id="scoring-display" class="hidden">
+            <!-- Scoring animation and details will be displayed here -->
+        </div>
+        
+        <div id="shop-area" class="hidden">
+            <h2>Shop</h2>
+            <div id="shop-items">
+                <!-- Shop items will be rendered here -->
+            </div>
+            <button id="close-shop-button">Continue</button>
+        </div>
+
+        <div id="pack-opening-area" class="hidden">
+            <h2 id="pack-opening-title">Opening Pack</h2>
+            <p id="pack-opening-rarity"></p>
+            <p id="pack-opening-instruction"></p>
+            <div id="pack-opening-choices">
+                <!-- Choices will be rendered here -->
+            </div>
+            <button id="confirm-pack-choice-button" disabled>Confirm</button>
+        </div>
+    </div>
+
+    <div id="targeting-overlay" class="hidden">
+        <div id="targeting-content">
+            <p id="targeting-text"></p>
+            <button id="cancel-targeting-button">Cancel</button>
+        </div>
+    </div>
+
+        <div id="error-dialog" class="hidden">
+            <div class="modal-content error-content">
+                <p class="error-message"></p>
+                <button class="error-close-btn">OK</button>
+            </div>
+        </div>
+
+    <div id="tooltip" class="hidden"></div>
+
+        <script src="app.js" type="module"></script>
+        <script src="balatro.js" type="module"></script>
+    </body>
+</html>

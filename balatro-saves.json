@@ -1,0 +1,829 @@
+{
+    "a3c04074-77fa-4570-8532-5f86bab1cbd3": {
+        "id": "a3c04074-77fa-4570-8532-5f86bab1cbd3",
+        "deck": [
+            {
+                "attributes": [
+                    0,
+                    0,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    0,
+                    0
+                ],
+                "enhancement": "bonus_mult"
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    1,
+                    1
+                ],
+                "enhancement": "x_mult"
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            }
+        ],
+        "board": [
+            {
+                "attributes": [
+                    0,
+                    1,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    2,
+                    1
+                ],
+                "enhancement": "x_mult"
+            }
+        ],
+        "discard_pile": [
+            {
+                "attributes": [
+                    0,
+                    2,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    2,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    0,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    2,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    1,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    2,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    1,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    0,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    2,
+                    2,
+                    0
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    0,
+                    0,
+                    0,
+                    2
+                ],
+                "enhancement": "bonus_mult"
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    1,
+                    0,
+                    0,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    0,
+                    1,
+                    2
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    1,
+                    1,
+                    1
+                ],
+                "enhancement": null
+            },
+            {
+                "attributes": [
+                    2,
+                    2,
+                    1,
+                    0
+                ],
+                "enhancement": null
+            }
+        ],
+        "played_set_types": [
+            "3_uniform_1_ladder",
+            "2_uniform_2_ladder"
+        ],
+        "set_type_levels": {
+            "3_uniform_1_ladder": 2,
+            "2_uniform_2_ladder": 2,
+            "1_uniform_3_ladder": 2,
+            "0_uniform_4_ladder": 2
+        },
+        "last_consumable_used": null,
+        "consumables": [
+            {
+                "id": "T_THE_WHEEL_OF_FORTUNE",
+                "name": "The Wheel of Fortune",
+                "description": "Make one random card a copy of selected card.",
+                "rarity": "Uncommon",
+                "tooltip": null,
+                "target_count": 1
+            }
+        ],
+        "consumable_slots": 2,
+        "money": 10,
+        "boss_blind_effect": null,
+        "ante": 2,
+        "round_score": 1437,
+        "current_blind_index": 1,
+        "boards_remaining": 0,
+        "discards_remaining": 0,
+        "board_size": 12,
+        "base_board_size": 12,
+        "jokers": [
+            {
+                "id": "J_SOLID_MULT",
+                "name": "Solidarity",
+                "description": "+3 Mult when scoring a solid card",
+                "rarity": "Common",
+                "eternal_mult": 0
+            },
+            {
+                "id": "J_OVAL_BOOST",
+                "name": "Oval Enthusiast",
+                "description": "+15 Chips when scoring an oval card",
+                "rarity": "Common",
+                "eternal_mult": 0
+            }
+        ],
+        "joker_slots": 5,
+        "shop_state": {
+            "joker_slots": [
+                {
+                    "item": {
+                        "id": "J_SCAVENGER",
+                        "name": "Scavenger",
+                        "description": "+1 Mult permanently when a card is discarded.",
+                        "rarity": "Uncommon",
+                        "eternal_mult": 0
+                    },
+                    "price": 6,
+                    "is_purchased": false
+                },
+                {
+                    "item": {
+                        "id": "J_ENHANCED_POWER",
+                        "name": "Enhancement Amplifier",
+                        "description": "x3 Mult when scoring an enhanced card",
+                        "rarity": "Rare",
+                        "eternal_mult": 0
+                    },
+                    "price": 8,
+                    "is_purchased": false
+                }
+            ],
+            "booster_pack_slots": [
+                {
+                    "name": "Celestial Pack",
+                    "price": 4,
+                    "is_purchased": false
+                },
+                {
+                    "name": "Tarot Pack",
+                    "price": 3,
+                    "is_purchased": false
+                }
+            ]
+        },
+        "pack_opening_state": null,
+        "game_phase": "shop",
+        "run_won": false
+    }
+}
