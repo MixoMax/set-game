@@ -20,6 +20,7 @@ export function showMsg(message, color = 'red') {
     errorContent.style.borderLeftColor = color;
 }
 
+
 const backButton = document.getElementById('back-button');
 export const gameBoardDiv = document.getElementById('game-board');
 export const cardGrid = document.getElementById('card-grid');
@@ -31,7 +32,6 @@ export const setsTotalSpan = document.getElementById('sets-total');
 export const gameOverModal = document.getElementById('game-over-modal');
 export const finalScoreSpan = document.getElementById('final-score');
 export const nameInput = document.getElementById('name-input');
-export const submitScoreButton = document.getElementById('submit-score-button');
 export const leaderboardList = document.getElementById('leaderboard-list');
 export const hintButton = document.getElementById('hint-button');
 export const challengeSetsContainer = document.getElementById('challenge-sets-container');

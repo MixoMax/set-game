@@ -2,7 +2,7 @@ import * as game from './app.js';
 
 
 document.addEventListener('DOMContentLoaded', () => {
-    game.submitScoreButton.addEventListener('click', game.submitScore);
+    document.getElementById('submit-score-button').addEventListener('click', game.submitScore);
     game.hintButton.addEventListener('click', () => game.getHint('timed'));
     startGame();
 });
