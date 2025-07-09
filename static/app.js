@@ -47,10 +47,15 @@ export let foundSets = [];
 export let excludedCardsQueue = [];
 export let hintSet = null;
 export let seed = null;
+export let hintsUsed = 0;
+export let foundSetCount = 0;
+export let totalHintsUsed = 0;
 
 export function setTimer(newTimer) { timer = newTimer; }
 export function setScore(newScore) { score = newScore; }
 export function setTimeLeft(newTimeLeft) { timeLeft = newTimeLeft; }
+export function addTimeLeft(seconds) { timeLeft += seconds; }
+export function removeTimeLeft(seconds) { timeLeft -= seconds; }
 export function setDealtCards(newDealtCards) { dealtCards = newDealtCards; }
 export function setSelectedCards(newSelectedCards) { selectedCards = newSelectedCards; }
 export function setAllSets(newAllSets) { allSets = newAllSets; }
@@ -200,12 +205,29 @@ export async function checkSet(gameMode) {
                 }
             }
         } else {
-            score++;
-            scoreSpan.textContent = score;
             if (gameMode === 'timed') {
-                setTimeLeft(timeLeft + 10);
                 timerSpan.textContent = timeLeft;
+                switch (hintsUsed) {
+                     case 0:
+                        score++;
+                        addTimeLeft(10);
+                        break;
+                    case 1:
+                        score += 0.5;
+                        addTimeLeft(5);
+                        break;
+                    case 2:
+                        score += 0.25;
+                        addTimeLeft(2);
+                        break;
+                }
+                totalHintsUsed += hintsUsed;
+                hintsUsed = 0;
+                foundSetCount++;
+            } else {
+                score++;
             }
+            scoreSpan.textContent = score;
         }
         await replaceCards(cardsToCheck, gameMode);
     } else {
@@ -258,7 +280,11 @@ export async function dealExtraCards(gameMode) {
 export function getHint(gameMode) {
     if (hintSet) {
         console.log("Using stored hint:", hintSet);
-        const cardToHint = hintSet[Math.floor(Math.random() * hintSet.length)];
+        let cardToHint = hintSet[Math.floor(Math.random() * hintSet.length)];
+        if( gameMode === 'timed') {
+            cardToHint = hintSet[hintsUsed % hintSet.length];
+            hintsUsed++;
+        }
         document.querySelectorAll('.card').forEach(cardElement => {
             const card = JSON.parse(cardElement.dataset.card);
             if (JSON.stringify(card) === JSON.stringify(cardToHint)) {
@@ -357,7 +383,7 @@ export async function replaceCards(cardsToReplace, gameMode) {
             newDealtCards.push(newCards[newCardIndex++]);
         }
         setDealtCards(newDealtCards);
-        renderCards();
+        renderCards(gameMode);
         await findAndStoreHint();
     } else {
         console.error("Failed to replace cards:", data.message);
@@ -367,7 +393,8 @@ export async function replaceCards(cardsToReplace, gameMode) {
 export function endGame(gameMode) {
     if (gameMode === 'timed') {
         gameOverModal.classList.remove('hidden');
-        finalScoreSpan.textContent = `Time's up! You found ${foundSets.length} sets!`;
+        score = Math.floor(score);
+        finalScoreSpan.textContent = `Time's up! You found ${foundSetCount} sets with the help of ${totalHintsUsed} hints!\nYour final score is: ${score}`;
         fetchLeaderboard();
     } else {
         window.location.href = "/";
