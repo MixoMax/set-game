@@ -21,7 +21,7 @@ function startGame() {
 }
 
 function updateTimer() {
-    game.setTimeLeft(game.timeLeft - 1);
+    game.removeTimeLeft(1);
     game.timerSpan.textContent = game.timeLeft;
     if (game.timeLeft <= 0) {
         console.log("Timer finished.");

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi import HTTPException
 from fastapi import BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 import random
@@ -19,6 +20,13 @@ from balatro_set_core import Card, ShopSlot, PackOpeningChoice, PackOpeningState
 from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities
 
 app = FastAPI()
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 LEADERBOARD_FILE = "leaderboard.json"
 
