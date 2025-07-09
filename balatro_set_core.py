@@ -1,26 +1,10 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import JSONResponse, FileResponse
-from pydantic import BaseModel
-import uvicorn
 import random
-import sys
-import os
-import json
 import itertools
 from typing import List, Dict, Any, Optional, Callable
 from enum import Enum
 from collections import Counter
-from uuid import uuid4
+from pydantic import BaseModel, Field
 
-app = FastAPI()
-
-if os.path.exists("balatro-saves.json"):
-    with open("balatro-saves.json", "r") as f:
-        GAME_SAVES = json.load(f)
-else:
-    GAME_SAVES = {}
-
-#%% --- Game Data ---
 
 class JokerTrigger(Enum):
     ON_SCORE_CALCULATION = "on_score_calculation"
@@ -83,7 +67,7 @@ class Joker(BaseModel):
     description: str
     rarity: str
     eternal_mult: int = 0
-    abilities: List[JokerAbility] = []
+    abilities: List[JokerAbility] = Field([], exclude=True)
 
     def copy(self, **kwargs):
         new_abilities = [a.copy(deep=True) for a in self.abilities]
@@ -95,7 +79,7 @@ class ConsumableCard(BaseModel):
     description: str
     rarity: str
     tooltip: Optional[str] = None
-    abilities: List[ConsumableAbility] = []
+    abilities: List[ConsumableAbility] = Field([], exclude=True)
     target_count: int = 0
 
 
@@ -137,8 +121,6 @@ def change_card_colors(game_state: 'GameState', color: int):
     """Change all cards on the board to a single color."""
     for card in game_state.board:
         card.attributes[0] = color  # Change the first attribute to the new color
-
-# NEW HELPER FUNCTIONS START HERE
 
 def get_joker_by_name(game_state: 'GameState', name: str) -> Optional['Joker']:
     """Finds a joker instance by its name."""
@@ -223,17 +205,13 @@ JOKER_DATABASE = {
     "J_DISCARD_MULT": Joker(id="J_DISCARD_MULT", name="Throwback", description="+1 Mult for every discard used this round", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + (3 - ctx.game.discards_remaining)))]),
     "J_ETERNAL_MULT": Joker(id="J_ETERNAL_MULT", name="Eternal", description="+1 Mult (persists between rounds)", rarity="Legendary", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + j.eternal_mult)), JokerAbility(trigger=JokerTrigger.END_OF_ROUND, ability=lambda j, ctx: setattr(j, 'eternal_mult', j.eternal_mult + 1))]),
     "J_FULL_HOUSE": Joker(id="J_FULL_HOUSE", name="Collector", description="x3 Mult if you have played 3 of the same type of Set this round", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if any(count >= 3 for count in Counter(ctx.game.played_set_types).values()) else None)]),
-    "J_SYNERGY_GREEN": Joker(id="J_SYNERGY_GREEN", name="Green Synergy", description="+10 Chips for each green card on the board", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 10 * sum(1 for card in ctx.game.board if card.attributes[0] == 0)))]),
-    "J_SYNERGY_RED": Joker(id="J_SYNERGY_RED", name="Red Synergy", description="+2 Mult for each red card played", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 2 * sum(1 for card in ctx.game.board if card.attributes[0] == 1)))]),
-    "J_PURPLE_CARD_MULT": Joker(id="J_PURPLE_CARD_MULT", name="Purple Power", description="x2 Mult when scoring a purple card", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 2) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[0] == 2 else None)]),
-    "J_OVAL_BOOST": Joker(id="J_OVAL_BOOST", name="Oval Enthusiast", description="+15 Chips when scoring an oval card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 15) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[1] == 1 else None)]),
-    "J_SOLID_MULT": Joker(id="J_SOLID_MULT", name="Solidarity", description="+3 Mult when scoring a solid card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[3] == 2 else None)]),
+    "J_SYNERGY_GREEN": Joker(id="J_SYNERGY_GREEN", name="Green Synergy", description="+10 Chips for each green card on the board", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 10 * sum(1 for card in ctx.game.board if card.attributes[0] == 2)))]),
+    "J_SYNERGY_RED": Joker(id="J_SYNERGY_RED", name="Red Synergy", description="+2 Mult for each red card played", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 2 * sum(1 for card in ctx.game.board if card.attributes[0] == 0)))]),
+    "J_PURPLE_CARD_MULT": Joker(id="J_PURPLE_CARD_MULT", name="Purple Power", description="x2 Mult when scoring a purple card", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 2) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[0] == 1 else None)]),
+    "J_OVAL_BOOST": Joker(id="J_OVAL_BOOST", name="Oval Enthusiast", description="+15 Chips when scoring an oval card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 15) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[1] == 0 else None)]),
+    "J_SOLID_MULT": Joker(id="J_SOLID_MULT", name="Solidarity", description="+3 Mult when scoring a solid card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[3] == 0 else None)]),
     "J_ENHANCED_POWER": Joker(id="J_ENHANCED_POWER", name="Enhancement Amplifier", description="x3 Mult when scoring an enhanced card", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.enhancement else None)]),
     "J_FIRST_CARD": Joker(id="J_FIRST_CARD", name="First Strike", description="+50 Chips for the first card scored in a set", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (setattr(j, '_cards_scored', getattr(j, '_cards_scored', 0) + 1), setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 50) if getattr(j, '_cards_scored', 0) == 1 else None, setattr(j, '_cards_scored', 0) if getattr(j, '_cards_scored', 0) >= 3 else None)[1])]),
-    "J_OP_TEST_ONLY": Joker(id="J_OP_TEST_ONLY", name="OP Test Only", description="This is an OP test-only joker. +1000000 Chips and x1000 Mult", rarity="Legendary", abilities=[
-        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 1000000)),
-        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=1000, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1000))
-    ]),
     "J_JUGGLER": Joker(
         id="J_JUGGLER",
         name="The Juggler",
@@ -315,6 +293,10 @@ JOKER_DATABASE = {
             JokerAbility(trigger=JokerTrigger.END_OF_ROUND, ability=lambda j, ctx: setattr(ctx.game, 'set_type_levels', {**ctx.game.set_type_levels, ctx.scoring.set_type_string: ctx.game.set_type_levels.get(ctx.scoring.set_type_string, 0) + 1}) if ctx.scoring and ctx.scoring.set_type_string else None)
         ]
     ),
+    "J_OP_TEST_ONLY": Joker(id="J_OP_TEST_ONLY", name="OP Test Joker, DO NOT BUY", description="This is an OP test-only joker. +1000000 Chips and x1000 Mult", rarity="Legendary", abilities=[
+        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 1000000)),
+        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=1000, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1000))
+    ]),
 }
 
 TAROT_DATABASE = {
@@ -452,9 +434,9 @@ TAROT_DATABASE = {
 
 JOKER_RARITY_PRICES = {"Common": 4, "Uncommon": 6, "Rare": 8, "Legendary": 10}
 
-def create_deck(): return [list(p) for p in itertools.product(range(3), repeat=4)]
+def b_create_deck(): return [list(p) for p in itertools.product(range(3), repeat=4)]
 
-def is_set(cards: List[List[int]]):
+def b_is_set(cards: List[List[int]]):
     if len(cards) != 3: return False
     for i in range(4):
         # Wildcard attribute is -1
@@ -545,7 +527,6 @@ class GameState(BaseModel):
 
 GameContext.model_rebuild()
 ConsumableContext.model_rebuild()
-current_game: Optional[GameState] = None
 
 ANTE_CONFIG = {
     1: {"scores": [300, 450, 600], "names": ["Small Blind", "Big Blind", "The Wall"], "boss_effects": [None, None, "debuff_first_joker"]},
@@ -565,7 +546,7 @@ PACK_RARITIES = {
     "Legendary": {"show": 5, "choose": 2, "weight": 2},
 }
 
-def get_random_joker_by_rarity(available_jokers: List[Joker]) -> Optional[Joker]:
+def get_random_joker_by_rarity(available_jokers: list[Joker]) -> Optional[Joker]:
     """Selects a random joker based on weighted rarity."""
     if not available_jokers:
         return None
@@ -590,7 +571,7 @@ def get_random_joker_by_rarity(available_jokers: List[Joker]) -> Optional[Joker]
     chosen_rarity = random.choices(possible_rarities, weights=weights, k=1)[0]
     return random.choice(jokers_by_rarity[chosen_rarity])
 
-def get_random_tarot_by_rarity(available_tarots: List[tuple[str, ConsumableCard]]) -> Optional[tuple[str, ConsumableCard]]:
+def get_random_tarot_by_rarity(available_tarots: list[tuple[str, ConsumableCard]]) -> Optional[tuple[str, ConsumableCard]]:
     """Selects a random tarot card based on weighted rarity."""
     if not available_tarots:
         return None
@@ -615,7 +596,7 @@ def get_random_pack_rarity():
     weights = [d['weight'] for d in PACK_RARITIES.values()]
     return random.choices(rarities, weights=weights, k=1)[0]
 
-def get_current_blind_info(game: GameState) -> Dict[str, Any]:
+def get_current_blind_info(game: GameState) -> dict[str, Any]:
     ante_info = ANTE_CONFIG.get(game.ante)
     if not ante_info or game.current_blind_index >= len(ante_info["scores"]):
         return {"name": "Unknown", "score_required": 999999}
@@ -686,530 +667,3 @@ def trigger_consumable_abilities(game: GameState, consumable: ConsumableCard, tr
     abilities_to_run = [ability for ability in consumable.abilities if ability.trigger == trigger]
     for ability_def in abilities_to_run:
         ability_def.ability(consumable, game_ctx)
-
-#%% --- API Endpoints ---
-
-@app.post("/api/balatro/new_run", response_model=GameState)
-async def new_run():
-    deck_cards = [Card(attributes=attr) for attr in create_deck()]
-    random.shuffle(deck_cards)
-    current_game = GameState(
-        board_size=12, base_board_size=12, money=4, boards_remaining=4, discards_remaining=3, ante=1,
-        current_blind_index=0, game_phase="playing",
-        jokers=[JOKER_DATABASE["J_CHIPS"].copy(), JOKER_DATABASE["J_MULT"].copy()],
-        set_type_levels={"4_uniform_0_ladder": 1, "3_uniform_1_ladder": 1, "2_uniform_2_ladder": 1, "1_uniform_3_ladder": 1, "0_uniform_4_ladder": 1}
-    )
-    current_game.board = deck_cards[:current_game.board_size]
-    current_game.deck = deck_cards[current_game.board_size:]
-
-    uid = str(uuid4())
-    current_game.id = uid
-    GAME_SAVES[uid] = current_game
-
-    return JSONResponse(content=current_game.model_dump())
-
-@app.get("/api/balatro/state")
-async def get_state(id: str):
-    
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-    blind_info = get_current_blind_info(current_game)
-    return {**current_game.model_dump(), "current_blind": blind_info["name"], "blind_score_required": blind_info["score_required"]}
-
-class PlaySetRequest(BaseModel): card_indices: List[int]
-
-
-@app.post("/api/balatro/play_set")
-async def play_set(request: PlaySetRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase != "playing":
-        raise HTTPException(status_code=400, detail="Not in a playing phase.")
-    if len(request.card_indices) != 3:
-        raise HTTPException(status_code=400, detail="Must select exactly 3 cards.")
-    if current_game.boards_remaining <= 0:
-        raise HTTPException(status_code=400, detail="No boards remaining.")
-    selected_cards = [current_game.board[i] for i in request.card_indices]
-    if not is_set([card.attributes for card in selected_cards]):
-        raise HTTPException(status_code=400, detail="Not a valid set.")
-
-    attributes = [card.attributes for card in selected_cards]
-    uniform_features, ladder_features = 0, 0
-    for i in range(4):
-        feature_values = {attrs[i] for attrs in attributes}
-        if len(feature_values) == 1:
-            uniform_features += 1
-        elif len(feature_values) == 3:
-            ladder_features += 1
-
-    set_type_string = f"{uniform_features}_uniform_{ladder_features}_ladder"
-    current_game.played_set_types.append(set_type_string)
-    level = current_game.set_type_levels.get(set_type_string, 1)
-    base_chips = (10 + (5 * uniform_features)) + (15 * (level - 1))
-    base_mult = (1 + ladder_features) * (1 + (level - 1) * 0.5)
-
-    scoring_ctx = ScoringContext(
-        base_chips=base_chips,
-        base_mult=base_mult,
-        flat_chips=0,
-        additive_mult=0,
-        multiplicative_mult=1,
-        uniform_features=uniform_features,
-        ladder_features=ladder_features,
-        set_type_string=set_type_string,
-        score_log=[]
-    )
-
-    # Log base set score
-    scoring_ctx.score_log.append(ScoreLogEntry(
-        source_type='set',
-        source_name=f"Played Set ({uniform_features}U, {ladder_features}L)",
-        description=f"Base score for a level {level} set.",
-        chips_before=0, mult_before=0,
-        chips_after=scoring_ctx.base_chips, mult_after=scoring_ctx.base_mult,
-        trigger_phase="set_base"
-    ))
-
-    # Score each card individually, then trigger jokers for that card
-    for card in selected_cards:
-        # Set the current card being scored
-        scoring_ctx.current_scoring_card = card
-        
-        card_scored = False
-        chips_before = scoring_ctx.base_chips + scoring_ctx.flat_chips
-        mult_before = (scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult
-        
-        card_mult_modifier = 1.0
-
-        if card.enhancement == "bonus_chips":
-            scoring_ctx.flat_chips += 30
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="Bonus Chips", description="+30 Chips",
-                chips_before=chips_before, mult_before=mult_before,
-                chips_after=scoring_ctx.base_chips + scoring_ctx.flat_chips, mult_after=mult_before,
-                trigger_phase="card_scoring"
-            ))
-        elif card.enhancement == "bonus_mult":
-            scoring_ctx.additive_mult += 2
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="Bonus Mult", description="+2 Mult",
-                chips_before=chips_before, mult_before=mult_before,
-                chips_after=chips_before, mult_after=(scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult,
-                trigger_phase="card_scoring"
-            ))
-        elif card.enhancement == "x_mult":
-            card_mult_modifier = 1.5
-            # The effect is logged after all other card-specific triggers
-        elif card.enhancement == "gold":
-            current_game.money += 3
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="Gold Card", description="+$3",
-                chips_before=chips_before, mult_before=mult_before,
-                chips_after=chips_before, mult_after=mult_before,
-                trigger_phase="card_scoring"
-            ))
-        elif card.enhancement == "wildcard":
-            # Wildcards provide no chips or mult, but can be part of any set
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="Wildcard", description="Wildcard (no score)",
-                chips_before=chips_before, mult_before=mult_before,
-                chips_after=chips_before, mult_after=mult_before,
-                trigger_phase="card_scoring"
-            ))
-
-
-        # Trigger jokers for this card
-        trigger_joker_abilities(current_game, JokerTrigger.ON_SCORE_CARD, scoring_ctx)
-
-        # Apply card-specific multiplicative multipliers after jokers
-        if card.enhancement == "x_mult":
-            chips_before_x = scoring_ctx.base_chips + scoring_ctx.flat_chips
-            mult_before_x = (scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult
-            scoring_ctx.multiplicative_mult *= card_mult_modifier
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="X-Mult Card", description="x1.5 Mult",
-                chips_before=chips_before_x, mult_before=mult_before_x,
-                chips_after=chips_before_x, mult_after=(scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult,
-                trigger_phase="card_scoring"
-            ))
-        
-        if card.enhancement == "amplify":
-            # If this card amplifies, we need to double the chips of other enhancements
-            chips_before_amplify = scoring_ctx.base_chips + scoring_ctx.flat_chips
-            mult_before_amplify = (scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult
-            scoring_ctx.flat_chips *= 2
-            scoring_ctx.additive_mult *= 2
-            scoring_ctx.score_log.append(ScoreLogEntry(
-                source_type='card', source_name="Amplified Card", description="Doubled Chips and Mult",
-                chips_before=chips_before_amplify, mult_before=mult_before_amplify,
-                chips_after=scoring_ctx.base_chips + scoring_ctx.flat_chips, mult_after=(scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult,
-                trigger_phase="card_scoring"
-            ))
-
-        trigger_joker_abilities(current_game, JokerTrigger.ON_SCORE_CARD, scoring_ctx)
-
-    # Clear the current scoring card before final triggers
-    scoring_ctx.current_scoring_card = None
-    
-    # After all cards, trigger jokers for the end of scoring
-    trigger_joker_abilities(current_game, JokerTrigger.ON_SCORE_CALCULATION, scoring_ctx)
-
-    chips = scoring_ctx.base_chips + scoring_ctx.flat_chips
-    mult = (scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult
-    score_gained = int(chips * mult)
-    current_game.round_score += score_gained
-
-    current_game.discard_pile.extend(selected_cards)
-    for i in sorted(request.card_indices, reverse=True):
-        current_game.board.pop(i)
-
-    draw_count = max(0, current_game.board_size - len(current_game.board))
-    if len(current_game.deck) < draw_count:
-        current_game.deck.extend(current_game.discard_pile)
-        random.shuffle(current_game.deck)
-        current_game.discard_pile = []
-
-    new_cards = current_game.deck[:draw_count]
-    current_game.board.extend(new_cards)
-    current_game.deck = current_game.deck[draw_count:]
-    current_game.boards_remaining -= 1
-
-    blind_info = get_current_blind_info(current_game)
-    if current_game.round_score >= blind_info["score_required"]:
-        current_game.game_phase = "shop"
-        current_game.money += 3 + current_game.boards_remaining
-        current_game.shop_state = ShopState()
-        available_jokers = [j for j in JOKER_DATABASE.values() if j.name not in {j.name for j in current_game.jokers}]
-        
-        num_jokers_to_add = min(2, len(available_jokers))
-        for _ in range(num_jokers_to_add):
-            if not available_jokers:
-                break
-            
-            joker_to_add = get_random_joker_by_rarity(available_jokers)
-            if not joker_to_add:
-                continue
-
-            available_jokers = [j for j in available_jokers if j.name != joker_to_add.name]
-
-            price = JOKER_RARITY_PRICES.get(joker_to_add.rarity, 4)
-            current_game.shop_state.joker_slots.append(ShopSlot(item=joker_to_add, price=price))
-        current_game.shop_state.booster_pack_slots.append(BoosterPack(name="Celestial Pack", price=4))
-        current_game.shop_state.booster_pack_slots.append(BoosterPack(name="Tarot Pack", price=3))
-    elif current_game.boards_remaining <= 0:
-        current_game.game_phase = "game_over"
-
-    game_state_dict = current_game.model_dump()
-    game_state_dict["current_blind"] = blind_info["name"]
-    game_state_dict["blind_score_required"] = blind_info["score_required"]
-
-    final_scoring_details = {
-        "chips": chips,
-        "mult": mult,
-        "score_gained": score_gained,
-        "score_log": [log.model_dump() for log in scoring_ctx.score_log]
-    }
-
-    return {"game_state": game_state_dict, "scoring_details": final_scoring_details}
-
-class DiscardRequest(BaseModel): card_indices: List[int]
-
-@app.post("/api/balatro/discard")
-async def discard(request: DiscardRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase != "playing": raise HTTPException(status_code=400, detail="Not in a playing phase.")
-    if not (1 <= len(request.card_indices) <= 5): raise HTTPException(status_code=400, detail="Must select between 1 and 5 cards to discard.")
-    if current_game.discards_remaining <= 0: raise HTTPException(status_code=400, detail="No discards remaining.")
-    
-    selected_cards = [current_game.board[i] for i in request.card_indices]
-    current_game.discard_pile.extend(selected_cards)
-    for i in sorted(request.card_indices, reverse=True): current_game.board.pop(i)
-    
-    draw_count = max(0, current_game.board_size - len(current_game.board))
-    if len(current_game.deck) < draw_count:
-        current_game.deck.extend(current_game.discard_pile)
-        random.shuffle(current_game.deck)
-        current_game.discard_pile = []
-    
-    new_cards = current_game.deck[:draw_count]
-    current_game.board.extend(new_cards)
-    current_game.deck = current_game.deck[draw_count:]
-    current_game.discards_remaining -= 1
-    
-    blind_info = get_current_blind_info(current_game)
-    game_state_dict = current_game.model_dump()
-    game_state_dict["current_blind"] = blind_info["name"]
-    game_state_dict["blind_score_required"] = blind_info["score_required"]
-    return {"game_state": game_state_dict}
-
-class BuyJokerRequest(BaseModel): slot_index: int
-
-@app.post("/api/balatro/buy_joker")
-async def buy_joker(request: BuyJokerRequest, id: str):
-    
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
-    if len(current_game.jokers) >= current_game.joker_slots: raise HTTPException(status_code=400, detail="No empty joker slots.")
-    slot_index = request.slot_index
-    if not (0 <= slot_index < len(current_game.shop_state.joker_slots)): raise HTTPException(status_code=400, detail="Invalid shop slot.")
-    slot = current_game.shop_state.joker_slots[slot_index]
-    if slot.is_purchased: raise HTTPException(status_code=400, detail="Item already purchased.")
-    if current_game.money < slot.price: raise HTTPException(status_code=400, detail="Not enough money.")
-    
-    current_game.money -= slot.price
-    current_game.jokers.append(slot.item.copy())
-    slot.is_purchased = True
-    return {"game_state": current_game.model_dump()}
-
-class BuyBoosterRequest(BaseModel): slot_index: int
-
-@app.post("/api/balatro/buy_booster_pack")
-async def buy_booster_pack(request: BuyBoosterRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-    
-    if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
-    slot_index = request.slot_index
-    if not (0 <= slot_index < len(current_game.shop_state.booster_pack_slots)): raise HTTPException(status_code=400, detail="Invalid pack slot.")
-    pack = current_game.shop_state.booster_pack_slots[slot_index]
-    if pack.is_purchased: raise HTTPException(status_code=400, detail="Pack already purchased.")
-    if current_game.money < pack.price: raise HTTPException(status_code=400, detail="Not enough money.")
-    
-    current_game.money -= pack.price
-    pack.is_purchased = True
-    
-    rarity = get_random_pack_rarity()
-    rarity_info = PACK_RARITIES[rarity]
-    
-    choices = []
-    if pack.name == "Celestial Pack":
-        all_set_types = list(current_game.set_type_levels.keys())
-        random.shuffle(all_set_types)
-        for type_key in all_set_types[:rarity_info['show']]:
-            level = current_game.set_type_levels[type_key]
-            name = type_key.replace("_", " ").replace("ladder", "L").replace("uniform", "U")
-            choices.append(PackOpeningChoice(id=type_key, name=f"Level up {name}", description=f"From Level {level} to {level + 1}"))
-    elif pack.name == "Tarot Pack":
-        if len(current_game.consumables) >= current_game.consumable_slots:
-            current_game.money += pack.price # Refund
-            pack.is_purchased = False
-            raise HTTPException(status_code=400, detail="Not enough consumable slots to open pack.")
-        
-        available_tarots = list(TAROT_DATABASE.items())
-        
-        pack_choices = []
-        for _ in range(rarity_info['show']):
-            if not available_tarots: break
-            
-            result = get_random_tarot_by_rarity(available_tarots)
-            if not result: continue
-            chosen_key, chosen_card = result
-            
-            pack_choices.append(PackOpeningChoice(id=chosen_key, name=chosen_card.name, description=chosen_card.description))
-            
-            available_tarots = [(k, c) for k, c in available_tarots if k != chosen_key]
-        choices = pack_choices
-
-    current_game.pack_opening_state = PackOpeningState(
-        pack_type=pack.name,
-        choices=choices,
-        rarity=rarity,
-        choose=rarity_info['choose']
-    )
-    current_game.game_phase = "pack_opening"
-    
-    return {"game_state": current_game.model_dump()}
-
-class ChoosePackRewardRequest(BaseModel):
-    selected_ids: List[str]
-
-@app.post("/api/balatro/choose_pack_reward")
-async def choose_pack_reward(request: ChoosePackRewardRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-    if not current_game or current_game.game_phase != "pack_opening":
-        raise HTTPException(status_code=400, detail="Not in pack opening phase.")
-    
-    pack_state = current_game.pack_opening_state
-    if len(request.selected_ids) > pack_state.choose:
-        raise HTTPException(status_code=400, detail=f"Can only choose up to {pack_state.choose} rewards.")
-
-    message = ""
-    if pack_state.pack_type == "Celestial Pack":
-        upgraded_names = []
-        for type_key in request.selected_ids:
-            current_game.set_type_levels[type_key] += 1
-            upgraded_names.append(type_key.replace("_", " ").replace("ladder", "L").replace("uniform", "U"))
-        message = f"Upgraded: {', '.join(upgraded_names)}!"
-    elif pack_state.pack_type == "Tarot Pack":
-        gained_cards = []
-        for card_key in request.selected_ids:
-            if len(current_game.consumables) < current_game.consumable_slots:
-                card = TAROT_DATABASE[card_key]
-                current_game.consumables.append(card)
-                gained_cards.append(card.name)
-        message = f"Gained: {', '.join(gained_cards)}!"
-
-    current_game.pack_opening_state = None
-    current_game.game_phase = "shop"
-    
-    return {"game_state": current_game.model_dump(), "message": message}
-
-class UseConsumableRequest(BaseModel):
-    consumable_index: int
-    target_card_indices: Optional[List[int]] = None
-
-@app.post("/api/balatro/use_consumable")
-async def use_consumable(request: UseConsumableRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase != "playing": raise HTTPException(status_code=400, detail="Can only use consumables during a round.")
-    index = request.consumable_index
-    if not (0 <= index < len(current_game.consumables)): raise HTTPException(status_code=400, detail="Invalid consumable index.")
-    
-    consumable = current_game.consumables[index] # Don't pop yet
-
-    # Validation for target count
-    if consumable.target_count > 0:
-        if not request.target_card_indices or len(request.target_card_indices) != consumable.target_count:
-            raise HTTPException(status_code=400, detail=f"This consumable requires selecting {consumable.target_count} card(s).")
-
-    # Now pop it
-    consumable = current_game.consumables.pop(index)
-    current_game.last_consumable_used = consumable
-    
-    consumable_ctx = ConsumableContext(game=current_game, message=f"Used {consumable.name}.")
-    game_ctx = GameContext(
-        game=current_game,
-        consumable=consumable_ctx,
-        selected_card_indices=request.target_card_indices or []
-    )
-    trigger_consumable_abilities(current_game, consumable, ConsumableTrigger.ON_USE, game_ctx)
-    
-    return {"game_state": current_game.model_dump(), "message": game_ctx.consumable.message}
-
-class ReorderJokersRequest(BaseModel):
-    new_order: List[int]
-
-@app.post("/api/balatro/reorder_jokers")
-async def reorder_jokers(request: ReorderJokersRequest, id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase not in ["playing", "shop"]:
-        raise HTTPException(status_code=400, detail="Can only reorder jokers during playing or shop phase.")
-
-    new_order_indices = request.new_order
-    jokers = current_game.jokers
-
-    if len(new_order_indices) != len(jokers) or set(new_order_indices) != set(range(len(jokers))):
-        raise HTTPException(status_code=400, detail="Invalid new order provided.")
-
-    reordered_jokers = [jokers[i] for i in new_order_indices]
-    current_game.jokers = reordered_jokers
-
-    # No need to return the full game state, just a success message is fine
-    # to reduce network traffic, but returning state is also okay.
-    return {"game_state": current_game.model_dump()}
-
-
-@app.post("/api/balatro/leave_shop")
-async def leave_shop(id: str):
-    if id not in GAME_SAVES:
-        raise HTTPException(status_code=404, detail="Game not found.")
-    current_game = GAME_SAVES[id]
-
-    if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
-    
-    trigger_joker_abilities(current_game, JokerTrigger.END_OF_ROUND)
-    
-    interest_cap = 5
-    interest_earned = min(current_game.money // 5, interest_cap)
-    current_game.money += interest_earned
-    
-    current_game.current_blind_index += 1
-    if current_game.current_blind_index >= len(ANTE_CONFIG[current_game.ante]["names"]):
-        current_game.ante += 1
-        current_game.current_blind_index = 0
-        if current_game.ante > max(ANTE_CONFIG.keys()):
-            current_game.game_phase = "run_won"
-            return {"game_state": current_game.model_dump()}
-    
-    current_game.game_phase = "playing"
-    current_game.round_score = 0
-    current_game.boards_remaining = 4
-    current_game.discards_remaining = 3
-    current_game.played_set_types = []
-    current_game.board_size = current_game.base_board_size
-
-    # Reshuffle all cards back into the deck
-    all_cards = current_game.deck + current_game.board + current_game.discard_pile
-    random.shuffle(all_cards)
-    
-    current_game.board = all_cards[:current_game.board_size]
-    current_game.deck = all_cards[current_game.board_size:]
-    current_game.discard_pile = []
-    
-    ante_info = ANTE_CONFIG.get(current_game.ante, {})
-    boss_effects = ante_info.get("boss_effects")
-    current_game.boss_blind_effect = boss_effects[current_game.current_blind_index] if boss_effects and current_game.current_blind_index < len(boss_effects) else None
-    
-    if current_game.boss_blind_effect == "reduce_board_size":
-        current_game.board_size = 9
-        if len(current_game.board) > current_game.board_size:
-            cards_to_discard_count = len(current_game.board) - current_game.board_size
-            cards_to_discard = random.sample(current_game.board, cards_to_discard_count)
-            current_game.discard_pile.extend(cards_to_discard)
-            current_game.board = [card for card in current_game.board if card not in cards_to_discard]
-    
-    blind_info = get_current_blind_info(current_game)
-    game_state_dict = current_game.model_dump()
-    game_state_dict["current_blind"] = blind_info["name"]
-    game_state_dict["blind_score_required"] = blind_info["score_required"]
-    return {"game_state": game_state_dict}
-
-@app.get("/api/balatro/saves")
-async def get_saves():
-    blind_infos = []
-    for uid, game in GAME_SAVES.items():
-        blind_info = get_current_blind_info(game)
-        blind_infos.append({
-            "id": uid,
-            "current_blind": blind_info["name"],
-            "blind_score_required": blind_info["score_required"],
-            "round_score": game.round_score,
-            "game_phase": game.game_phase
-        })
-    return {"saves": blind_infos}
-
-
-@app.get("/{path:path}")
-async def serve_file(path: str):
-    if path == "" or path == "balatro":
-        path = "balatro.html"
-    file_path = os.path.join("static", path)
-
-    if os.path.exists(file_path):
-        return FileResponse(file_path)
-    else:
-        raise HTTPException(status_code=404, detail="File not found.")
-
-if __name__ == "__main__":
-    port = 8001
-    if len(sys.argv) > 1: port = int(sys.argv[1])
-    uvicorn.run(app, host="0.0.0.0", port=port)

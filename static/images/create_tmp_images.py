@@ -100,5 +100,5 @@ def create_card_images(md_file, output_dir):
 
 if __name__ == "__main__":
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    md_file_path = os.path.join(script_dir, 'tmp.md')
+    md_file_path = os.path.join(script_dir, '_tmp.md')
     create_card_images(md_file_path, script_dir)

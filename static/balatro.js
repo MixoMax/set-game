@@ -78,6 +78,16 @@ const api = {
         }
         return res.json();
     }),
+    sellJoker: (id, joker_index) => fetch(`${API_BASE}/sell_joker?id=${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ joker_index })
+    }).then(res => {
+        if (!res.ok) {
+            return res.json().then(err => { throw new Error(err.detail || "Server error") });
+        }
+        return res.json();
+    }),
 };
 
 let draggedJokerIndex = null;
@@ -89,12 +99,17 @@ const state = {
     gameId: null,
 };
 
-const DOMElements = {
-    moneyValue: document.getElementById('money-value'),
-    anteValue: document.getElementById('ante-value'),
+let DOMElements = {};
+
+function init() {
+    DOMElements = {
+        moneyValue: document.getElementById('money-value'),
+        anteValue: document.getElementById('ante-value'),
     blindType: document.getElementById('blind-type'),
     currentScore: document.getElementById('current-score'),
     requiredScore: document.getElementById('required-score'),
+    scoreProgressBar: document.getElementById('score-progress-bar'),
+    scoreProgressContainer: document.getElementById('score-progress-container'),
     jokerArea: document.getElementById('joker-area'),
     consumableArea: document.getElementById('consumable-area'),
     cardGrid: document.getElementById('card-grid'),
@@ -111,7 +126,7 @@ const DOMElements = {
     endRunContainer: document.getElementById('end-run-container'),
     returnToLobbyButton: document.getElementById('return-to-lobby-button'),
     scoringDisplay: document.getElementById('scoring-display'),
-    shopOverlay: document.getElementById('shop-overlay'),
+    shopArea: document.getElementById('shop-area'),
     shopItems: document.getElementById('shop-items'),
     closeShopButton: document.getElementById('close-shop-button'),
     bossBlindEffectDisplay: document.getElementById('boss-blind-effect-display'),
@@ -119,15 +134,31 @@ const DOMElements = {
     targetingOverlay: document.getElementById('targeting-overlay'),
     targetingText: document.getElementById('targeting-text'),
     cancelTargetingButton: document.getElementById('cancel-targeting-button'),
-    packOpeningOverlay: document.getElementById('pack-opening-overlay'),
-    packOpeningContent: document.getElementById('pack-opening-content'),
+    packOpeningArea: document.getElementById('pack-opening-area'),
     packOpeningTitle: document.getElementById('pack-opening-title'),
     packOpeningRarity: document.getElementById('pack-opening-rarity'),
     packOpeningInstruction: document.getElementById('pack-opening-instruction'),
     packOpeningChoices: document.getElementById('pack-opening-choices'),
-    confirmPackChoiceButton: document.getElementById('confirm-pack-choice-button'),
-    tooltip: document.getElementById('tooltip'),
-};
+        confirmPackChoiceButton: document.getElementById('confirm-pack-choice-button'),
+        tooltip: document.getElementById('tooltip'),
+    };
+
+    DOMElements.lobbyNewRunButton.addEventListener('click', startNewRun);
+    DOMElements.returnToLobbyButton.addEventListener('click', showLobby);
+    DOMElements.playSetButton.addEventListener('click', playSet);
+    DOMElements.discardButton.addEventListener('click', discard);
+    DOMElements.closeShopButton.addEventListener('click', handleLeaveShop);
+    DOMElements.cancelTargetingButton.addEventListener('click', cancelTargeting);
+    DOMElements.confirmPackChoiceButton.addEventListener('click', handleConfirmPackChoice);
+
+    DOMElements.jokerArea.addEventListener('dragstart', handleJokerDragStart);
+    DOMElements.jokerArea.addEventListener('dragover', handleJokerDragOver);
+    DOMElements.jokerArea.addEventListener('dragleave', handleJokerDragLeave);
+    DOMElements.jokerArea.addEventListener('drop', handleJokerDrop);
+    DOMElements.jokerArea.addEventListener('dragend', handleJokerDragEnd);
+    
+    showLobby();
+}
 
 function showTooltip(content, event) {
     const tooltip = DOMElements.tooltip;
@@ -224,10 +255,13 @@ function renderCard(card, index) {
     return cardEl;
 }
 
-function renderJoker(joker, index) {
+function renderJoker(joker, index, context = 'player') {
     const jokerEl = document.createElement('div');
     jokerEl.classList.add('joker-card', joker.rarity.toLowerCase());
-    jokerEl.setAttribute('draggable', 'true');
+    // Draggable only when not in shop and is a player joker
+    if (context === 'player' && state.game.game_phase !== 'shop') {
+        jokerEl.setAttribute('draggable', 'true');
+    }
     jokerEl.dataset.index = index;
     
     const imageSrc = `/images/${joker.id}.webp`;
@@ -254,6 +288,22 @@ function renderJoker(joker, index) {
         eternalMultEl.classList.add('eternal-mult');
         eternalMultEl.textContent = `+${joker.eternal_mult}`;
         jokerEl.appendChild(eternalMultEl);
+    }
+
+    // Add sell button if it's a player's joker and we are in the shop phase
+    if (context === 'player' && state.game && state.game.game_phase === 'shop') {
+        const sellButton = document.createElement('button');
+        sellButton.classList.add('sell-joker-button');
+        // In a real game, you'd fetch these prices from a config.
+        // For now, let's hardcode based on the backend logic.
+        const rarityPrices = { 'Common': 4, 'Uncommon': 6, 'Rare': 8, 'Legendary': 10 };
+        const sellPrice = Math.floor((rarityPrices[joker.rarity] || 4) / 2);
+        sellButton.textContent = `Sell ($${sellPrice})`;
+        sellButton.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent card click events
+            handleSellJoker(index);
+        });
+        jokerEl.appendChild(sellButton);
     }
 
     return jokerEl;
@@ -294,7 +344,7 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
     // Render Jokers
     DOMElements.jokerArea.innerHTML = '';
     gameState.jokers.forEach((joker, index) => {
-        const jokerEl = renderJoker(joker, index);
+        const jokerEl = renderJoker(joker, index, 'player');
         DOMElements.jokerArea.appendChild(jokerEl);
     });
 
@@ -310,9 +360,11 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
     const isTargeting = gameState.game_phase === 'targeting_card';
     const isPackOpening = gameState.game_phase === 'pack_opening';
 
-    DOMElements.shopOverlay.classList.toggle('hidden', !isShop);
+    DOMElements.shopArea.classList.toggle('hidden', !isShop);
+    DOMElements.packOpeningArea.classList.toggle('hidden', !isPackOpening);
     DOMElements.targetingOverlay.classList.toggle('hidden', !isTargeting);
-    DOMElements.packOpeningOverlay.classList.toggle('hidden', !isPackOpening);
+    DOMElements.scoreProgressContainer.style.visibility = (isShop || isPackOpening) ? 'hidden' : 'visible';
+
     DOMElements.controls.style.display = (isShop || isTargeting || isPackOpening) ? 'none' : 'flex';
     DOMElements.boardArea.style.display = (isShop || isPackOpening) ? 'none' : 'block';
 
@@ -442,17 +494,13 @@ async function playSet() {
         console.log("api.playSet returned");
         state.selectedCards.clear();
 
-        // Update the state object immediately, but defer the full UI render
-        // by passing `isMidAnimation = true`. This prevents rendering conflicts.
-        updateUI(newState, oldState, true);
-
-        // Now, run the scoring animation. It will use the `scoringDetails` from the API
-        // and the `oldState` for context.
-        await showScoringAnimation(cardElements, selectedCardsData, scoringDetails, oldState);
+        // Run the scoring animation first. We pass the newState to it so it knows the final score.
+        // This prevents the UI from updating instantly before the animation.
+        await showScoringAnimation(cardElements, selectedCardsData, scoringDetails, oldState, newState);
 
         console.log("Scoring animation finished, performing final UI update.");
-        // Finally, perform the full UI render with the latest state.
-        updateUI(state.game, oldState);
+        // Now that the animation is done, update the state and do a full UI render.
+        updateUI(newState, oldState);
 
     } catch (error) {
         console.error("Error in playSet:", error);
@@ -519,6 +567,17 @@ async function handleBuyJoker(slotIndex) {
     } catch (error) {
         console.error("Error buying joker:", error);
         showMsg(error.message || "Failed to buy joker.");
+    }
+}
+
+async function handleSellJoker(jokerIndex) {
+    try {
+        const { game_state: newGameState, message } = await api.sellJoker(state.gameId, jokerIndex);
+        if (message) showMsg(message);
+        updateUI(newGameState); // Re-render the shop and player state
+    } catch (error) {
+        console.error("Error selling joker:", error);
+        showMsg(error.message || "Failed to sell joker.");
     }
 }
 
@@ -602,7 +661,7 @@ function renderShop(gameState) {
         shopItemEl.classList.add('shop-item');
 
         if (slot.item) {
-            const jokerEl = renderJoker(slot.item);
+            const jokerEl = renderJoker(slot.item, index, 'shop');
             shopItemEl.appendChild(jokerEl);
 
             const buyButton = document.createElement('button');
@@ -680,7 +739,7 @@ async function loadGame(id, gameState = null) {
         // Reset UI elements that might persist from previous games
         DOMElements.controls.style.display = 'flex';
         DOMElements.boardArea.style.display = 'block';
-        DOMElements.shopOverlay.classList.add('hidden');
+        DOMElements.shopArea.classList.add('hidden');
 
         updateUI(gameToLoad);
     } catch (error) {
@@ -698,6 +757,7 @@ function renderLobby(saves) {
     }
 
     saves.forEach(save => {
+        console.log("Rendering save:", save);
         const saveEl = document.createElement('li');
         saveEl.classList.add('save-game-entry');
         saveEl.innerHTML = `
@@ -706,30 +766,13 @@ function renderLobby(saves) {
                 <span class="save-ante">Ante: ${save.ante || 1}</span>
                 <span class="save-blind">Blind: ${save.current_blind || 'N/A'}</span>
                 <span class="save-phase">Phase: ${save.game_phase}</span>
+                <span class="save-money">Money: $${save.money}</span>
             </div>
             <button class="continue-button">Continue</button>
         `;
         saveEl.querySelector('.continue-button').addEventListener('click', () => loadGame(save.id));
         DOMElements.savesList.appendChild(saveEl);
     });
-}
-
-function init() {
-    DOMElements.lobbyNewRunButton.addEventListener('click', startNewRun);
-    DOMElements.returnToLobbyButton.addEventListener('click', showLobby);
-    DOMElements.playSetButton.addEventListener('click', playSet);
-    DOMElements.discardButton.addEventListener('click', discard);
-    DOMElements.closeShopButton.addEventListener('click', handleLeaveShop);
-    DOMElements.cancelTargetingButton.addEventListener('click', cancelTargeting);
-    DOMElements.confirmPackChoiceButton.addEventListener('click', handleConfirmPackChoice);
-
-    DOMElements.jokerArea.addEventListener('dragstart', handleJokerDragStart);
-    DOMElements.jokerArea.addEventListener('dragover', handleJokerDragOver);
-    DOMElements.jokerArea.addEventListener('dragleave', handleJokerDragLeave);
-    DOMElements.jokerArea.addEventListener('drop', handleJokerDrop);
-    DOMElements.jokerArea.addEventListener('dragend', handleJokerDragEnd);
-    
-    showLobby();
 }
 
 function handleJokerDragStart(event) {
@@ -820,8 +863,18 @@ async function handleJokerDrop(event) {
 
 function animateValue(element, from, to, duration = 400, isFloat = false) {
     return new Promise(resolve => {
+        const isScoreElement = element === DOMElements.currentScore;
+
+        const updateProgressBar = (score) => {
+            if (!isScoreElement) return;
+            const requiredScore = state.game.blind_score_required || 1; // Avoid division by zero
+            const percentage = (score / requiredScore) * 100;
+            DOMElements.scoreProgressBar.style.width = `${Math.min(percentage, 100)}%`;
+        };
+
         if (from === to) {
             element.textContent = isFloat ? to.toFixed(2) : Math.round(to);
+            updateProgressBar(to);
             resolve();
             return;
         }
@@ -832,6 +885,8 @@ function animateValue(element, from, to, duration = 400, isFloat = false) {
             const progress = Math.min(elapsed / duration, 1);
             const currentValue = from + (to - from) * progress;
             element.textContent = isFloat ? currentValue.toFixed(2) : Math.round(currentValue);
+            updateProgressBar(currentValue);
+
             if (progress < 1) {
                 requestAnimationFrame(frame);
             } else {
@@ -843,8 +898,9 @@ function animateValue(element, from, to, duration = 400, isFloat = false) {
 }
 
 function animateScore(from, to) {
-    if (from === to) return;
-    // This is a fire-and-forget animation
+    // This is a fire-and-forget animation.
+    // We don't check from === to because animateValue handles it,
+    // and we need it to run to ensure the display is correct even if the value hasn't changed.
     animateValue(DOMElements.currentScore, from, to, 500, false);
 }
 
@@ -870,7 +926,7 @@ function createScorePopup(text, type, x, y) {
     setTimeout(() => popup.remove(), 1400);
 }
 
-async function showScoringAnimation(selectedCardElements, selectedCardsData, scoringDetails, oldState) {
+async function showScoringAnimation(selectedCardElements, selectedCardsData, scoringDetails, oldState, newState) {
     const { score_log = [], score_gained = 0 } = scoringDetails || {};
     console.log("showScoringAnimation called with:", {
         selectedCardElements,
@@ -1044,7 +1100,7 @@ async function showScoringAnimation(selectedCardElements, selectedCardsData, sco
     }
 
     // Animate the main score counter
-    animateScore(oldState.round_score, state.game.round_score);
+    animateScore(oldState.round_score, newState.round_score);
 
     // --- Show Final Score ---
     finalScoreValueEl.textContent = score_gained;
@@ -1060,7 +1116,7 @@ async function showScoringAnimation(selectedCardElements, selectedCardsData, sco
 
 function renderPackOpening(packState) {
     if (!packState) {
-        DOMElements.packOpeningOverlay.classList.add('hidden');
+        DOMElements.packOpeningArea.classList.add('hidden');
         return;
     }
 
@@ -1070,29 +1126,41 @@ function renderPackOpening(packState) {
 
     DOMElements.packOpeningTitle.textContent = `Opening ${packState.pack_type}`;
     DOMElements.packOpeningRarity.textContent = packState.rarity;
-    DOMElements.packOpeningRarity.className = ''; // Clear old classes
+    DOMElements.packOpeningRarity.className = 'pack-opening-rarity'; // Clear old classes
     DOMElements.packOpeningRarity.classList.add(packState.rarity);
 
     DOMElements.packOpeningInstruction.textContent = `Choose ${packState.choose}:`;
 
     DOMElements.packOpeningChoices.innerHTML = '';
     packState.choices.forEach(choice => {
-        const choiceEl = document.createElement('div');
-        choiceEl.classList.add('pack-choice');
-        choiceEl.dataset.id = choice.id;
-        choiceEl.innerHTML = `
-            <div class="name">${choice.name}</div>
-            <div class="description">${choice.description}</div>
+        // A tarot card is basically a consumable. Let's treat it like one.
+        const cardEl = document.createElement('div');
+        // Use consumable-card for styling, but add pack-choice for selection logic
+        cardEl.classList.add('consumable-card', 'pack-choice', packState.rarity.toLowerCase());
+        cardEl.dataset.id = choice.id;
+
+        const imageSrc = `/images/${choice.id}.webp`;
+
+        cardEl.innerHTML = `
+            <div class="card-image-container">
+                <img src="${imageSrc}" alt="${choice.name}" class="card-image" onerror="this.style.display='none'">
+            </div>
         `;
-        choiceEl.addEventListener('click', () => handlePackChoiceClick(choice.id, packState.choose));
-        DOMElements.packOpeningChoices.appendChild(choiceEl);
+        
+        const tooltipContent = `<strong>${choice.name}</strong><br>${choice.description}`;
+        cardEl.addEventListener('mouseover', (event) => showTooltip(tooltipContent, event));
+        cardEl.addEventListener('mouseout', hideTooltip);
+        cardEl.addEventListener('mousemove', updateTooltipPosition);
+
+        cardEl.addEventListener('click', () => handlePackChoiceClick(choice.id, packState.choose));
+        DOMElements.packOpeningChoices.appendChild(cardEl);
     });
 
     DOMElements.confirmPackChoiceButton.disabled = true;
 }
 
 function handlePackChoiceClick(choiceId, chooseLimit) {
-    const choiceEl = DOMElements.packOpeningChoices.querySelector(`[data-id="${choiceId}"]`);
+    const choiceEl = DOMElements.packOpeningChoices.querySelector(`.pack-choice[data-id="${choiceId}"]`);
     if (!choiceEl) return;
 
     if (state.selectedPackChoices.has(choiceId)) {
@@ -1127,4 +1195,4 @@ async function handleConfirmPackChoice() {
     }
 }
 
-init();
+document.addEventListener('DOMContentLoaded', init);

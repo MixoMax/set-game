@@ -34,5 +34,9 @@
     {
         "name": "as",
         "score": 0
+    },
+    {
+        "name": "test abc",
+        "score": 0
     }
 ]

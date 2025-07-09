@@ -361,8 +361,13 @@ export async function replaceCards(cardsToReplace, gameMode) {
 }
 
 export function endGame(gameMode) {
-    console.log("Game over.");
-    window.location.href = "/";
+    if (gameMode === 'timed') {
+        gameOverModal.classList.remove('hidden');
+        finalScoreSpan.textContent = `Time's up! You found ${foundSets.length} sets!`;
+        fetchLeaderboard();
+    } else {
+        window.location.href = "/";
+    }
 }
 
 export async function fetchLeaderboard() {

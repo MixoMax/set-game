@@ -1,3 +1,4 @@
+# Jokers (persistent)
 - J_CHIPS -> Joker: +10 Chips
 - J_MULT -> Droll Joker: +2 Mult
 - J_XMULT -> Crazy joker: x2 Mult
@@ -22,6 +23,7 @@
 - J_GAMBLER -> Gambler: 50% chance to x3 Mult, 50% chance to set Mult to 1.
 - J_OBSERVATORY -> Observatory: Increases the level of the played Set type by an additional +1 after scoring.
 
+# Tarot Cards (one time use)
 - T_THE_EMPRESS -> The Empress: Enhance 2 random cards to +30 Chips each.
 - T_THE_HIEROPHANT -> The Hierophant: Enhance 2 random cards to +2 Mult each.
 - T_THE_TOWER -> The Tower: Enhance 1 random card to x1.5 Mult.
@@ -36,3 +38,8 @@
 - T_THE_CHARIOT -> The Chariot: Enhance 1 selected card to +2 Mult.
 - T_THE_WHEEL_OF_FORTUNE -> The Wheel of Fortune: Make one random card a copy of selected card.
 - T_THE_HANGED_MAN -> The Hanged Man: Gain 1 extra hand
+
+- 0_uniform_4_ladder -> 0 Uniforms, 4 Ladders: Level up sets with 0 uniform and 4 ladder features.
+- 1_uniform_3_ladder -> 1 Uniform, 3 Ladders: Level up sets with 1 uniform and 3 ladder features.
+- 2_uniform_2_ladder -> 2 Uniforms, 2 Ladders: Level up sets with 2 uniform and 2 ladder features.
+- 3_uniform_1_ladder -> 3 Uniforms, 1 Ladder: Level up sets with 3 uniform and 1 ladder features.

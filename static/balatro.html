@@ -34,7 +34,7 @@
                 </div>
                 <div id="score-progress-container">
                     <div id="score-progress-bar"></div>
-                    <span id="current-score">0</span> / <span id="required-score">300</span>
+                    <span id="current-score">0</span> <span>/</span> <span id="required-score">300</span>
                 </div>
             </div>
         </div>
@@ -69,15 +69,23 @@
         <div id="scoring-display" class="hidden">
             <!-- Scoring animation and details will be displayed here -->
         </div>
-    </div>
-
-    <div id="shop-overlay" class="hidden">
-        <div id="shop-content">
+        
+        <div id="shop-area" class="hidden">
             <h2>Shop</h2>
             <div id="shop-items">
                 <!-- Shop items will be rendered here -->
             </div>
             <button id="close-shop-button">Continue</button>
+        </div>
+
+        <div id="pack-opening-area" class="hidden">
+            <h2 id="pack-opening-title">Opening Pack</h2>
+            <p id="pack-opening-rarity"></p>
+            <p id="pack-opening-instruction"></p>
+            <div id="pack-opening-choices">
+                <!-- Choices will be rendered here -->
+            </div>
+            <button id="confirm-pack-choice-button" disabled>Confirm</button>
         </div>
     </div>
 
@@ -92,18 +100,6 @@
             <div class="modal-content error-content">
                 <p class="error-message"></p>
                 <button class="error-close-btn">OK</button>
-            </div>
-        </div>
-
-        <div id="pack-opening-overlay" class="hidden">
-            <div id="pack-opening-content">
-                <h2 id="pack-opening-title">Opening Pack</h2>
-                <p id="pack-opening-rarity"></p>
-                <p id="pack-opening-instruction"></p>
-                <div id="pack-opening-choices">
-                    <!-- Choices will be rendered here -->
-                </div>
-                <button id="confirm-pack-choice-button" disabled>Confirm</button>
             </div>
         </div>
 
