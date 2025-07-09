@@ -2,9 +2,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi import HTTPException
 from fastapi import BackgroundTasks
-from pydantic import BaseModel, Field
-from pydantic.json_schema import JsonSchemaValue
-from pydantic_core import core_schema
+from pydantic import BaseModel
 import uvicorn
 import random
 import sys
@@ -700,6 +698,42 @@ async def leave_shop(id: str):
     game_state_dict["current_blind"] = blind_info["name"]
     game_state_dict["blind_score_required"] = blind_info["score_required"]
     return {"game_state": game_state_dict}
+
+@app.post("/api/balatro/set_money", include_in_schema=False)
+async def set_money(id: str, amount: int):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+    current_game.money = amount
+    return {"game_state": current_game.model_dump()}
+
+@app.post("/api/balatro/give_joker", include_in_schema=False)
+async def give_joker(id: str, joker_id: str):
+    from balatro_set_core import JOKER_DATABASE
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+    if joker_id not in JOKER_DATABASE:
+        raise HTTPException(status_code=400, detail="Invalid joker id.")
+    if len(current_game.jokers) >= current_game.joker_slots:
+        raise HTTPException(status_code=400, detail="No empty joker slots.")
+    joker = JOKER_DATABASE[joker_id].copy()
+    current_game.jokers.append(joker)
+    return {"game_state": current_game.model_dump()}
+
+@app.post("/api/balatro/give_tarot", include_in_schema=False)
+async def give_tarot(id: str, tarot_id: str):
+    from balatro_set_core import TAROT_DATABASE
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    current_game = GAME_SAVES[id]
+    if tarot_id not in TAROT_DATABASE:
+        raise HTTPException(status_code=400, detail="Invalid tarot id.")
+    if len(current_game.consumables) >= current_game.consumable_slots:
+        raise HTTPException(status_code=400, detail="No empty consumable slots.")
+    tarot = TAROT_DATABASE[tarot_id]
+    current_game.consumables.append(tarot)
+    return {"game_state": current_game.model_dump()}
 
 @app.get("/api/balatro/saves")
 async def get_saves():

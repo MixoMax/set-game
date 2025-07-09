@@ -17,7 +17,7 @@
 - J_FIRST_CARD -> First Strike: +50 Chips for the first card scored in a set
 - J_JUGGLER -> The Juggler: This Joker gains +1 Mult for every 2 cards on your board at end of round.
 - J_SCAVENGER -> Scavenger: +1 Mult permanently when a card is discarded.
-- J_ALCHEMIST -> The Alchemist: Converts all Chips from Jokers and cards into xMult at a rate of 100 Chips to x2 Mult, then sets Chips to 0. (Calculated before Base Chips)
+- J_ALCHEMIST -> The Alchemist: Converts Chips into xMult at a rate of 100 Chips to x2 Mult.
 - J_LAST_STAND -> Last Stand: x4 Mult on your final set of the round.
 - J_MIMIC -> The Mimic: Copies all scoring abilities of the Joker to its right.
 - J_GAMBLER -> Gambler: 50% chance to x3 Mult, 50% chance to set Mult to 1.
@@ -31,13 +31,13 @@
 - T_THE_WORLD -> The World: Make all cards on the board any random single color.
 - T_JUDGEMENT -> Judgement: Retrieve 3 random cards from your discard pile.
 - T_THE_DEVIL -> The Devil: Gain $15, but destroy a random Joker.
-- T_STRENGTH -> Strength: Enhance 1 random card to double the effect of other card enhancements in the scored set. (Ex: A +30 Chip card will give +60 Chips if this card is in the set)
-- T_THE_FOOL -> The Fool: Create 1 'Wildcard'. (Wildcard: Can be part of any Set. Provides no Chips or Mult itself)
+- T_STRENGTH -> Strength: Enhance 1 random card to double the effect of other card enhancements in the scored set. (Ex - A +30 Chip card will give +60 Chips if this card is in the set)
+- T_THE_FOOL -> The Fool: Create 1 'Wildcard'. (Wildcard - Can be part of any Set. Provides no Chips or Mult itself)
 - T_THE_HERMIT -> The Hermit: Gain +1 Board and +1 Discard for the current round.
 - T_THE_LOVERS -> The Lovers: Enhance 1 selected card to +30 Chips.
 - T_THE_CHARIOT -> The Chariot: Enhance 1 selected card to +2 Mult.
 - T_THE_WHEEL_OF_FORTUNE -> The Wheel of Fortune: Make one random card a copy of selected card.
-- T_THE_HANGED_MAN -> The Hanged Man: Gain 1 extra hand
+- T_THE_HANGED_MAN -> The Hanged Man: Gain 1 extra hand.
 
 - 0_uniform_4_ladder -> 0 Uniforms, 4 Ladders: Level up sets with 0 uniform and 4 ladder features.
 - 1_uniform_3_ladder -> 1 Uniform, 3 Ladders: Level up sets with 1 uniform and 3 ladder features.

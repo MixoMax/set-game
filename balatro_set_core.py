@@ -130,13 +130,15 @@ def get_joker_by_name(game_state: 'GameState', name: str) -> Optional['Joker']:
     return None
 
 def j_alchemist_ability(joker: 'Joker', ctx: 'GameContext'):
-    """Converts Chips to xMult, then resets Chips."""
-    chips_to_convert = ctx.scoring.flat_chips
-    if chips_to_convert > 0:
-        # Every 50 chips provides +x0.5 Mult
-        mult_gain = 1.0 + (chips_to_convert / 100.0)
-        ctx.scoring.multiplicative_mult *= mult_gain
-        ctx.scoring.flat_chips = 0
+    chips_to_convert = ctx.scoring.flat_chips + ctx.scoring.base_chips
+    n_100s, remainder = divmod(chips_to_convert, 100)
+    print(f"Converting {chips_to_convert} Chips to Multiplier: {n_100s} x2 Multiplier(s) and {remainder} remaining Chips.")
+    if n_100s > 0:
+        ctx.scoring.multiplicative_mult *= 2 * n_100s
+    ctx.scoring.base_chips = remainder
+    ctx.scoring.flat_chips = 0  # Reset flat chips after conversion
+
+
 
 def j_mimic_ability(joker: 'Joker', ctx: 'GameContext'):
     """Copies the abilities of the Joker to its right."""
@@ -237,12 +239,11 @@ JOKER_DATABASE = {
     "J_ALCHEMIST": Joker(
         id="J_ALCHEMIST",
         name="The Alchemist",
-        description="Converts all Chips from Jokers and cards into xMult at a rate of 100 Chips to x2 Mult, then sets Chips to 0. (Calculated before Base Chips)",
+        description="Converts Chips into xMult at a rate of 100 Chips to x2 Mult.",
         rarity="Rare",
         abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=90, ability=j_alchemist_ability)
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=j_alchemist_ability)
         ]
-        # NOTE: The high priority (90) ensures it calculates after most +Chips jokers (priority 10) but before most xMult jokers (priority 100).
     ),
 
     "J_LAST_STAND": Joker(
@@ -421,6 +422,7 @@ TAROT_DATABASE = {
         target_count=1,
         abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_wheel_of_fortune_ability)]
     ),
+
     "T_THE_HANGED_MAN": ConsumableCard(
         id="T_THE_HANGED_MAN",
         name="The Hanged Man",
@@ -610,6 +612,8 @@ def trigger_joker_abilities(game: GameState, trigger: JokerTrigger, scoring_ctx:
     abilities_to_run = [(joker, ability) for joker in active_jokers for ability in joker.abilities if ability.trigger == trigger]
     abilities_to_run.sort(key=lambda x: x[1].priority)
     
+    print(f"Triggering {len(abilities_to_run)} joker abilities for trigger: {trigger.name}")
+
     game_ctx = GameContext(game=game, scoring=scoring_ctx)
     
     # Determine trigger phase for logging
@@ -623,6 +627,7 @@ def trigger_joker_abilities(game: GameState, trigger: JokerTrigger, scoring_ctx:
             additive_mult_before = scoring_ctx.additive_mult
             multiplicative_mult_before = scoring_ctx.multiplicative_mult
         
+        print(f"Running ability {ability_def.ability.__name__} for joker {joker.name} with trigger {trigger.name}")
         ability_def.ability(joker, game_ctx)
 
         if scoring_ctx:
@@ -633,6 +638,7 @@ def trigger_joker_abilities(game: GameState, trigger: JokerTrigger, scoring_ctx:
             chips_change = scoring_ctx.flat_chips - flat_chips_before
             additive_mult_change = scoring_ctx.additive_mult - additive_mult_before
             multiplicative_mult_change = scoring_ctx.multiplicative_mult / multiplicative_mult_before
+            print(f"Joker {joker.name} ability {ability_def.ability.__name__} changed chips from {chips_before} to {chips_after}, mult from {mult_before} to {mult_after}")
 
             if chips_change != 0 or additive_mult_change != 0 or abs(multiplicative_mult_change - 1) > 0.001:
                 description = ""
@@ -640,11 +646,18 @@ def trigger_joker_abilities(game: GameState, trigger: JokerTrigger, scoring_ctx:
                 # Priority order: chips -> additive mult -> multiplicative mult
                 if chips_change > 0: 
                     description = f"+{int(chips_change)} Chips"
+                elif chips_change < 0:
+                    description = f"{int(chips_change)} Chips"
                 elif additive_mult_change > 0:
                     if isinstance(additive_mult_change, int) or additive_mult_change.is_integer():
                          description = f"+{int(additive_mult_change)} Mult"
                     else:
                          description = f"+{additive_mult_change:.1f} Mult"
+                elif additive_mult_change < 0:
+                    if isinstance(additive_mult_change, int) or additive_mult_change.is_integer():
+                        description = f"{int(additive_mult_change)} Mult"
+                    else:
+                        description = f"{additive_mult_change:.1f} Mult"
                 elif abs(multiplicative_mult_change - 1) > 0.001:
                     if multiplicative_mult_change.is_integer():
                         description = f"x{int(multiplicative_mult_change)} Mult"

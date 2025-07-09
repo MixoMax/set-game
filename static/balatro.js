@@ -339,7 +339,9 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
     }
 
     // Animate score
-    animateScore(oldGameState.round_score || 0, gameState.round_score);
+    if (oldGameState.round_score != gameState.round_score) {
+        animateScore(oldGameState.round_score || 0, gameState.round_score);
+    }
 
     // Render Jokers
     DOMElements.jokerArea.innerHTML = '';
@@ -1084,7 +1086,7 @@ async function showScoringAnimation(selectedCardElements, selectedCardsData, sco
             lastMult = newMult;
 
             // Update the total immediately after sub-values finish animating
-            scoringTotalValueEl.textContent = Math.round(lastChips * lastMult);
+            scoringTotalValueEl.textContent = Math.floor(lastChips * lastMult);
         }
     }
 
@@ -1100,10 +1102,10 @@ async function showScoringAnimation(selectedCardElements, selectedCardsData, sco
     }
 
     // Animate the main score counter
-    animateScore(oldState.round_score, newState.round_score);
+    animateScore(oldState.round_score, Math.floor(newState.round_score));
 
     // --- Show Final Score ---
-    finalScoreValueEl.textContent = score_gained;
+    finalScoreValueEl.textContent = Math.floor(score_gained);
     finalScoreValueEl.parentElement.classList.add('show-final');
 
     // --- Hide Scoring Display ---
@@ -1186,7 +1188,6 @@ async function handleConfirmPackChoice() {
 
     try {
         const { game_state: newGameState, message } = await api.choosePackReward(state.gameId, selectedIds);
-        if (message) showMsg(message);
         updateUI(newGameState);
     } catch (error) {
         console.error("Error confirming pack choice:", error);
@@ -1196,3 +1197,53 @@ async function handleConfirmPackChoice() {
 }
 
 document.addEventListener('DOMContentLoaded', init);
+
+// === DEV CHEAT FUNCTIONS ===
+// Usage in browser console: setMoney(100), giveJoker("J_CHIPS"), giveTarot("T_THE_EMPRESS")
+window.setMoney = async function(amount) {
+    if (!state.gameId) {
+        console.error("No game loaded.");
+        return;
+    }
+    try {
+        const res = await fetch(`/api/balatro/set_money?id=${state.gameId}&amount=${amount}`, { method: 'POST' });
+        if (!res.ok) throw new Error("Failed to set money");
+        const data = await res.json();
+        updateUI(data.game_state);
+        console.log("Money set to", amount);
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+window.giveJoker = async function(jokerId) {
+    if (!state.gameId) {
+        console.error("No game loaded.");
+        return;
+    }
+    try {
+        const res = await fetch(`/api/balatro/give_joker?id=${state.gameId}&joker_id=${jokerId}`, { method: 'POST' });
+        if (!res.ok) throw new Error("Failed to give joker");
+        const data = await res.json();
+        updateUI(data.game_state);
+        console.log("Gave joker", jokerId);
+    } catch (e) {
+        console.error(e);
+    }
+};
+
+window.giveTarot = async function(tarotId) {
+    if (!state.gameId) {
+        console.error("No game loaded.");
+        return;
+    }
+    try {
+        const res = await fetch(`/api/balatro/give_tarot?id=${state.gameId}&tarot_id=${tarotId}`, { method: 'POST' });
+        if (!res.ok) throw new Error("Failed to give tarot");
+        const data = await res.json();
+        updateUI(data.game_state);
+        console.log("Gave tarot", tarotId);
+    } catch (e) {
+        console.error(e);
+    }
+};
