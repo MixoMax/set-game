@@ -202,6 +202,10 @@ export async function checkSet(gameMode) {
         } else {
             score++;
             scoreSpan.textContent = score;
+            if (gameMode === 'timed') {
+                setTimeLeft(timeLeft + 10);
+                timerSpan.textContent = timeLeft;
+            }
         }
         await replaceCards(cardsToCheck, gameMode);
     } else {
@@ -393,6 +397,7 @@ export async function submitScore() {
         body: JSON.stringify({ name, score })
     });
     gameOverModal.classList.add('hidden');
+    window.location.href = '/';
 }
 
 export async function dealInitialCards(gameMode, overrideSeed = false) {
