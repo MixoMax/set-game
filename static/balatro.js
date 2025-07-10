@@ -88,6 +88,8 @@ const api = {
         }
         return res.json();
     }),
+    deleteSave: (id) => fetch(`${API_BASE}/saves/${id}`, { method: 'DELETE' })
+        .then(res => { if (!res.ok) throw new Error("Failed to delete save"); return res.json(); }),
 };
 
 let draggedJokerIndex = null;
@@ -156,7 +158,21 @@ function init() {
     DOMElements.jokerArea.addEventListener('dragleave', handleJokerDragLeave);
     DOMElements.jokerArea.addEventListener('drop', handleJokerDrop);
     DOMElements.jokerArea.addEventListener('dragend', handleJokerDragEnd);
-    
+
+    document.getElementById('order-button-quantity').addEventListener('click', () => handleOrderButtonClick(2));
+    document.getElementById('order-button-color').addEventListener('click', () => handleOrderButtonClick(0));
+    document.getElementById('order-button-shape').addEventListener('click', () => handleOrderButtonClick(1));
+    document.getElementById('order-button-shading').addEventListener('click', () => handleOrderButtonClick(3));
+
+    DOMElements.orderButtons = {
+        quantity: document.getElementById('order-button-quantity'),
+        color: document.getElementById('order-button-color'),
+        shape: document.getElementById('order-button-shape'),
+        shading: document.getElementById('order-button-shading'),
+    };
+    // Store reference to the "Order by" buttons container
+    DOMElements.orderContainer = document.querySelectorAll('#controls')[1];
+
     showLobby();
 }
 
@@ -191,6 +207,35 @@ function updateTooltipPosition(event) {
 
     tooltip.style.left = `${left}px`;
     tooltip.style.top = `${top}px`;
+}
+
+function sortCardsByAttribute(attributeIndex) {
+    const cards = Array.from(DOMElements.cardGrid.children);
+    const cardDict = {}; // value: list[cardEl]
+    cards.forEach(card => {
+        const value = card.dataset.cardId.split('-')[attributeIndex];
+        if (!cardDict[value]) {
+            cardDict[value] = [];
+        }
+        cardDict[value].push(card);
+    });
+
+    // Sort the cardDict keys
+    const sortedKeys = Object.keys(cardDict).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+    // Clear the card grid
+    DOMElements.cardGrid.innerHTML = '';
+
+    // Append the sorted cards back to the grid
+    sortedKeys.forEach(key => {
+        cardDict[key].forEach(card => DOMElements.cardGrid.appendChild(card));
+    });
+}
+
+function handleOrderButtonClick(attributeIndex) {
+    if (!state.game || state.game.game_phase !== 'playing') return;
+
+    sortCardsByAttribute(attributeIndex);
 }
 
 function renderCard(card, index) {
@@ -283,11 +328,12 @@ function renderJoker(joker, index, context = 'player') {
         updateTooltipPosition(event);
     });
 
-    if (joker.eternal_mult > 0) {
-        const eternalMultEl = document.createElement('div');
-        eternalMultEl.classList.add('eternal-mult');
-        eternalMultEl.textContent = `+${joker.eternal_mult}`;
-        jokerEl.appendChild(eternalMultEl);
+    if (joker.display_badge) {
+        const badgeEl = document.createElement('div');
+        badgeEl.classList.add('joker-badge');
+        badgeEl.textContent = joker.display_badge;
+        badgeEl.title = joker.description;
+        jokerEl.appendChild(badgeEl);
     }
 
     // Add sell button if it's a player's joker and we are in the shop phase
@@ -345,8 +391,28 @@ function renderJoker(joker, index, context = 'player') {
     return jokerEl;
 }
 
+function updateScoreDisplay(score, targetScore) {
+    const currentScore = Math.floor(score);
+    const requiredScore = Math.floor(targetScore);
+
+    DOMElements.currentScore.textContent = currentScore;
+    DOMElements.requiredScore.textContent = requiredScore;
+
+    // Update progress bar
+    if (requiredScore > 0) {
+        const progress = Math.min(currentScore / requiredScore, 1);
+        DOMElements.scoreProgressBar.style.width = `${progress * 100}%`;
+    } else {
+        DOMElements.scoreProgressBar.style.width = '0%';
+    }
+}
+
 function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMidAnimation = false) {
     state.game = gameState;
+    // Show or hide "Order by" buttons container based on phase
+    if (DOMElements.orderContainer) {
+        DOMElements.orderContainer.style.display = (gameState.game_phase === 'playing') ? 'flex' : 'none';
+    }
 
     // If we are in the middle of another animation (like scoring),
     // just update the state object and bail. The full UI render will be called later.
@@ -362,6 +428,9 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
     DOMElements.boardsRemaining.textContent = gameState.boards_remaining;
     DOMElements.discardsRemaining.textContent = gameState.discards_remaining;
 
+    // Update score display
+    updateScoreDisplay(gameState.round_score, gameState.blind_score_required);
+
     // Handle boss blind display
     if (gameState.boss_blind_effect) {
         DOMElements.bossBlindEffectDisplay.classList.remove('hidden');
@@ -372,11 +441,6 @@ function updateUI(gameState, oldGameState = { round_score: 0, board: [] }, isMid
         DOMElements.bossBlindEffectText.textContent = effectDescriptions[gameState.boss_blind_effect] || gameState.boss_blind_effect;
     } else {
         DOMElements.bossBlindEffectDisplay.classList.add('hidden');
-    }
-
-    // Animate score
-    if (oldGameState.round_score != gameState.round_score) {
-        animateScore(oldGameState.round_score || 0, gameState.round_score);
     }
 
     // Render Jokers
@@ -508,6 +572,9 @@ function updateButtons() {
     if (!state.game || state.game.game_phase !== 'playing') {
         DOMElements.playSetButton.disabled = true;
         DOMElements.discardButton.disabled = true;
+        Object.values(DOMElements.orderButtons).forEach(button => {
+            button.disabled = true;
+        });
         return;
     }
     const selectedCount = state.selectedCards.size;
@@ -549,8 +616,6 @@ async function playSet() {
         cardElements.forEach(el => el.classList.remove('fly-out'));
     }
 }
-
-
 
 async function discard() {
     const selectedCount = state.selectedCards.size;
@@ -779,6 +844,8 @@ async function loadGame(id, gameState = null) {
         DOMElements.boardArea.style.display = 'block';
         DOMElements.shopArea.classList.add('hidden');
 
+        DOMElements.scoreProgress = document.getElementById('score-progress-container');
+
         updateUI(gameToLoad);
     } catch (error) {
         showMsg("Failed to load game.");
@@ -809,6 +876,18 @@ function renderLobby(saves) {
             <button class="continue-button">Continue</button>
         `;
         saveEl.querySelector('.continue-button').addEventListener('click', () => loadGame(save.id));
+        const deleteBtn = document.createElement('button');
+        deleteBtn.classList.add('delete-button');
+        deleteBtn.textContent = 'Delete';
+        deleteBtn.addEventListener('click', async () => {
+            try {
+                await api.deleteSave(save.id);
+                showLobby();
+            } catch (e) {
+                showMsg('Failed to delete save.');
+            }
+        });
+        saveEl.appendChild(deleteBtn);
         DOMElements.savesList.appendChild(saveEl);
     });
 }
@@ -1136,9 +1215,6 @@ async function showScoringAnimation(selectedCardElements, selectedCardsData, sco
         }
         cardIndex++;
     }
-
-    // Animate the main score counter
-    animateScore(oldState.round_score, Math.floor(newState.round_score));
 
     // --- Show Final Score ---
     finalScoreValueEl.textContent = Math.floor(score_gained);

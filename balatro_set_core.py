@@ -9,8 +9,17 @@ from pydantic import BaseModel, Field
 class JokerTrigger(Enum):
     ON_SCORE_CALCULATION = "on_score_calculation"
     ON_SCORE_CARD = "on_score_card"
-    END_OF_ROUND = "end_of_round"
+    ON_END_OF_ROUND = "on_end_of_round"
     ON_DISCARD = "on_discard"
+
+    # TODO: Implement these triggers
+    ON_CONSUMABLE_USE = "on_consumable_use"
+    ON_BUY_SELF = "on_buy_self"
+    ON_DESTROY_SELF = "on_destroy_self"
+
+    ON_BUY_JOKER = "on_buy_joker"
+    ON_DESTROY_JOKER = "on_destroy_joker"
+
 
 class ConsumableTrigger(Enum):
     ON_USE = "on_use"
@@ -59,7 +68,6 @@ class GameContext(BaseModel):
 
 class JokerAbility(BaseModel):
     trigger: JokerTrigger
-    priority: int = 10 
     ability: Callable[['Joker', GameContext], None]
     class Config: arbitrary_types_allowed = True
 
@@ -73,8 +81,14 @@ class Joker(BaseModel):
     name: str
     description: str
     rarity: str
+
     variant: JokerVariant = JokerVariant.BASIC
-    eternal_mult: int = 0
+
+    display_badge: Optional[str] = None
+    calculate_display_badge: Callable[['Joker', GameContext], Optional[str]] = None
+
+    custom_data: Dict[str, Any] = Field(default_factory=dict, exclude=True)
+
     abilities: List[JokerAbility] = Field([], exclude=True)
 
     def copy(self, **kwargs):
@@ -137,31 +151,6 @@ def get_joker_by_name(game_state: 'GameState', name: str) -> Optional['Joker']:
             return j
     return None
 
-def j_alchemist_ability(joker: 'Joker', ctx: 'GameContext'):
-    chips_to_convert = ctx.scoring.flat_chips + ctx.scoring.base_chips
-    n_100s, remainder = divmod(chips_to_convert, 100)
-    print(f"Converting {chips_to_convert} Chips to Multiplier: {n_100s} x2 Multiplier(s) and {remainder} remaining Chips.")
-    if n_100s > 0:
-        ctx.scoring.multiplicative_mult *= 2 * n_100s
-    ctx.scoring.base_chips = remainder
-    ctx.scoring.flat_chips = 0  # Reset flat chips after conversion
-
-
-
-def j_mimic_ability(joker: 'Joker', ctx: 'GameContext'):
-    """Copies the abilities of the Joker to its right."""
-    joker_index = -1
-    for i, j in enumerate(ctx.game.jokers):
-        if j is joker:
-            joker_index = i
-            break
-    
-    if joker_index != -1 and joker_index < len(ctx.game.jokers) - 1:
-        joker_to_mimic = ctx.game.jokers[joker_index + 1]
-        # Mimic all of the target joker's scoring abilities
-        for ability_def in joker_to_mimic.abilities:
-            if ability_def.trigger in [JokerTrigger.ON_SCORE_CALCULATION, JokerTrigger.ON_SCORE_CARD]:
-                ability_def.ability(joker_to_mimic, ctx)
 
 def retrieve_from_discard(game_state: 'GameState', count: int):
     """Retrieves random cards from the discard pile back to board."""
@@ -176,8 +165,8 @@ def retrieve_from_discard(game_state: 'GameState', count: int):
         game_state.board.append(card_to_retrieve)
 
 def t_wheel_of_fortune_ability(card: 'Card', ctx: 'GameContext'):
-    """Make one random card a copy of selected card."""
-    
+    """Make two random cards a copy of selected card."""
+
     game_state = ctx.game
     indices = ctx.selected_card_indices
     
@@ -195,117 +184,502 @@ def t_wheel_of_fortune_ability(card: 'Card', ctx: 'GameContext'):
     
     selected_card = game_state.board[selected_index]
 
-    random_card_idx = random.choice([i for i in range(len(game_state.board)) if i != selected_index])
-    game_state.board[random_card_idx] = Card(
-        attributes=selected_card.attributes.copy(),
-        enhancement=selected_card.enhancement
-    )
+    random_card_ids = random.sample(range(len(game_state.board)), 2)
+    for i in random_card_ids:
+        if i != selected_index:
+            game_state.board[i] = Card(
+                attributes=selected_card.attributes.copy(),
+                enhancement=selected_card.enhancement
+            )
 
     return 1
 
 
 
 JOKER_DATABASE = {
-    "J_CHIPS": Joker(id="J_CHIPS", name="Joker", description="+10 Chips", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 10))]),
-    "J_MULT": Joker(id="J_MULT", name="Droll Joker", description="+2 Mult", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 2))]),
-    "J_XMULT": Joker(id="J_XMULT", name="Crazy Joker", description="x2 Mult", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 2))]),
-    "J_UNIFORM_CHIPS": Joker(id="J_UNIFORM_CHIPS", name="Greedy Joker", description="+20 Chips for each uniform feature", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 20 * ctx.scoring.uniform_features))]),
-    "J_LADDER_MULT": Joker(id="J_LADDER_MULT", name="Crafty Joker", description="+1 Mult for each ladder feature", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 1 * ctx.scoring.ladder_features))]),
-    "J_MONEY_MULT": Joker(id="J_MONEY_MULT", name="Midas Mask", description="+1 Mult for every $5 you have", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + ctx.game.money // 5))]),
-    "J_DISCARD_MULT": Joker(id="J_DISCARD_MULT", name="Throwback", description="+1 Mult for every discard used this round", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + (3 - ctx.game.discards_remaining)))]),
-    "J_ETERNAL_MULT": Joker(id="J_ETERNAL_MULT", name="Eternal", description="+1 Mult (persists between rounds)", rarity="Legendary", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + j.eternal_mult)), JokerAbility(trigger=JokerTrigger.END_OF_ROUND, ability=lambda j, ctx: setattr(j, 'eternal_mult', j.eternal_mult + 1))]),
-    "J_FULL_HOUSE": Joker(id="J_FULL_HOUSE", name="Collector", description="x3 Mult if you have played 3 of the same type of Set this round", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if any(count >= 3 for count in Counter(ctx.game.played_set_types).values()) else None)]),
-    "J_SYNERGY_GREEN": Joker(id="J_SYNERGY_GREEN", name="Green Synergy", description="+10 Chips for each green card on the board", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 10 * sum(1 for card in ctx.game.board if card.attributes[0] == 2)))]),
-    "J_SYNERGY_RED": Joker(id="J_SYNERGY_RED", name="Red Synergy", description="+2 Mult for each red card played", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 2 * sum(1 for card in ctx.game.board if card.attributes[0] == 0)))]),
-    "J_PURPLE_CARD_MULT": Joker(id="J_PURPLE_CARD_MULT", name="Purple Power", description="x2 Mult when scoring a purple card", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 2) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[0] == 1 else None)]),
-    "J_OVAL_BOOST": Joker(id="J_OVAL_BOOST", name="Oval Enthusiast", description="+15 Chips when scoring an oval card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 15) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[1] == 0 else None)]),
-    "J_SOLID_MULT": Joker(id="J_SOLID_MULT", name="Solidarity", description="+3 Mult when scoring a solid card", rarity="Common", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.attributes[3] == 0 else None)]),
-    "J_ENHANCED_POWER": Joker(id="J_ENHANCED_POWER", name="Enhancement Amplifier", description="x3 Mult when scoring an enhanced card", rarity="Rare", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if ctx.scoring.current_scoring_card and ctx.scoring.current_scoring_card.enhancement else None)]),
-    "J_FIRST_CARD": Joker(id="J_FIRST_CARD", name="First Strike", description="+50 Chips for the first card scored in a set", rarity="Uncommon", abilities=[JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (setattr(j, '_cards_scored', getattr(j, '_cards_scored', 0) + 1), setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 50) if getattr(j, '_cards_scored', 0) == 1 else None, setattr(j, '_cards_scored', 0) if getattr(j, '_cards_scored', 0) >= 3 else None)[1])]),
+    # default joker
+    "J_MULT": Joker(
+        id="J_MULT",
+        name="Joker",
+        description="+4 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 4))
+        ]
+    ),
+
+    # set of +3 mult per color jokers
+    "J_GREEDY": Joker(
+        id="J_GREEDY",
+        name="Greedy Joker",
+        description="Played green cards give +3 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 0 else None
+            ))
+        ]
+    ),
+    "J_LUSTY": Joker(
+        id="J_LUSTY",
+        name="Lusty Joker",
+        description="Played red cards give +3 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 1 else None
+            ))
+        ]
+    ),
+    "J_Wrathful": Joker(
+        id="J_WRATHFUL",
+        name="Wrathful Joker",
+        description="Played magenta cards give +3 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 2 else None
+            ))
+        ]
+    ),
+
+    # +mult and + chips for played features jokers
+    "J_JOLLY": Joker(
+        id="J_JOLLY",
+        name="Jolly Joker",
+        description="+8 Mult if played set is (3U, 1L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 8) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "3_uniform_1_ladder" else None
+            ))
+        ]
+    ),
+    "J_ZANNY": Joker(
+        id="J_ZANNY",
+        name="Zanny Joker",
+        description="+12 Mult if played set is (2U, 2L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 12) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "2_uniform_2_ladder" else None
+            ))
+        ]
+    ),
+    "J_MAD": Joker(
+        id="J_MAD",
+        name="Mad Joker",
+        description="+16 Mult if played set is (1U, 3L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 16) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "1_uniform_3_ladder" else None
+            ))
+        ]
+    ),
+    "J_CRAZY": Joker(
+        id="J_CRAZY",
+        name="Crazy Joker",
+        description="+20 Mult if played set is (0U, 4L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 20) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "0_uniform_4_ladder" else None
+            ))
+        ]
+    ),
+    "J_SLY": Joker(
+        id="J_SLY",
+        name="Sly Joker",
+        description="+50 Chips if played set is (3U, 1L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 50) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "3_uniform_1_ladder" else None
+            ))
+        ]
+    ),
+    "J_WILY": Joker(
+        id="J_WILY",
+        name="Wily Joker",
+        description="+100 Chips if played set is (2U, 2L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 100) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "2_uniform_2_ladder" else None
+            ))
+        ]
+    ),
+    "J_CLEVER": Joker(
+        id="J_CLEVER",
+        name="Clever Joker",
+        description="+150 Chips if played set is (1U, 3L)",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 150) if ctx.game.played_set_types and ctx.game.played_set_types[-1] == "1_uniform_3_ladder" else None
+            ))
+        ]
+    ),
+
+    "J_STENCIL": Joker(
+        id="J_STENCIL",
+        name="Joker Stencil",
+        description="x1 Mult for each empty Joker slot",
+        rarity="Uncommon",
+        display_badge="x{empty_slots} M",
+        calculate_display_badge=lambda j, ctx: f"x{ctx.game.joker_slots - len(ctx.game.jokers)} M",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * (ctx.game.joker_slots - len(ctx.game.jokers)))
+            ))
+        ]
+    ),
+
+    "J_BANNER": Joker(
+        id="J_BANNER",
+        name="Banner",
+        description="+30 Chips for each remaining discard",
+        rarity="Common",
+        display_badge="+{remaining_discards} C",
+        calculate_display_badge=lambda j, ctx: f"+{ctx.game.discards_remaining * 30} C",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + ctx.game.discards_remaining * 30)
+            ))
+        ]
+    ),
+
+    "J_MYSTIC_SUMMIT": Joker(
+        id="J_MYSTIC_SUMMIT",
+        name="Mystic Summit",
+        description="+15 Mult when 0 discards remaining",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult + 15) if ctx.game.discards_remaining == 0 else None
+            ))
+        ]
+    ),
+
+    "J_LOYALTY_CARD": Joker(
+        id="J_LOYALTY_CARD",
+        name="Loyalty Card",
+        description="x4 Mult every 6 hands played",
+        rarity="Uncommon",
+        display_badge="{n_hands} remaining",
+        custom_data={"n_hands": 6},
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 4) if ctx.game.played_set_types and len(ctx.game.played_set_types) % 6 == 0 else None
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(j.custom_data, 'n_hands', (j.custom_data['n_hands'] - 1) if j.custom_data['n_hands'] > 0 else 6)
+            ))
+        ],
+        calculate_display_badge=lambda j, ctx: f"{j.custom_data['n_hands']} remaining"
+    ),
+    "J_8_BALL": Joker(
+        id="J_8_BALL",
+        name="8-Ball",
+        description="1 in 4 to create a Tarot card when scoring",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                ctx.game.consumables.append(get_random_tarot_by_rarity(list(TAROT_DATABASE.items()))) if random.random() < 0.25 and len(ctx.game.consumables) < ctx.game.consumable_slots else None
+            ))
+        ]
+    ),
+    "J_MISPRINT": Joker(
+        id="J_MISPRINT",
+        name="Misprint",
+        description="+0-23 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + random.randint(0, 23))
+            ))
+        ]
+    ),
+    "J_FIBONACCI": Joker(
+        id="J_FIBONACCI",
+        name="Fibonacci",
+        description="Each played Solid Oval card gives +8 Mult",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 8) if ctx.scoring.current_scoring_card.attributes[1] == 0 and ctx.scoring.current_scoring_card.attributes[3] == 0 else None
+            ))
+        ]
+    ),
+    "J_SCARY_FACE": Joker(
+        id="J_SCARY_FACE",
+        name="Scary Face",
+        description="Each played card with 3 symbols gives +30 Chips",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 30) if ctx.scoring.current_scoring_card.attributes[2] == 2 else None
+            ))
+        ]
+    ),
+    "J_ABSTRACT": Joker(
+        id="J_ABSTRACT",
+        name="Abstract",
+        description="+3 Mult for each Joker held",
+        rarity="Common",
+        display_badge="+{n_jokers} M",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3 * len(ctx.game.jokers))
+            ))
+        ],
+        calculate_display_badge=lambda j, ctx: f"+{3 * len(ctx.game.jokers)} M"
+    ),
+    "J_DELAYED_GRATIFICATION": Joker(
+        id="J_DELAYED_GRATIFICATION",
+        name="Delayed Gratification",
+        description="Earn $2 per discard if no discards are used by end of round",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_END_OF_ROUND, ability=lambda j, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + 2 * ctx.game.discards_remaining) if ctx.game.discards_remaining > 0 else None
+            ))
+        ]
+    ),
+    "J_FACELESS": Joker(
+        id="J_FACELESS",
+        name="Faceless Joker",
+        description="Earn $5 if 3 or more Triangle cards are discarded at the same time",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_DISCARD, ability=lambda j, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + 5) if len([c for c in ctx.game.discard_pile if c.attributes[1] == 1]) >= 3 else None
+            ))
+        ]
+    ),
+    "J_SUPERPOSITION": Joker(
+        id="J_SUPERPOSITION",
+        name="Superposition",
+        description="Create a Tarot card when scoring a set with a striped green card",
+        rarity="Rare",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                create_tarot_card(ctx.game) if any(c.attributes[0] == 2 and c.attributes[3] == 1 for c in ctx.game.scoring_cards) else None
+            ))
+        ]
+    ),
+    "J_VAMPIRE": Joker(
+        id="J_VAMPIRE",
+        name="Vampire",
+        description="This joker gains x0.1 Mult per scoring enhanced card played, removes card Enhancement",
+        rarity="Uncommon",
+        custom_data={"eternal_x_mult": 1.0},
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(j.custom_data, 'eternal_x_mult', j.custom_data['eternal_x_mult'] + 0.1) if ctx.scoring.current_scoring_card.enhancement else None
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring.current_scoring_card, 'enhancement', None) if ctx.scoring.current_scoring_card.enhancement else None
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * j.custom_data['eternal_x_mult'])
+            ))
+        ],
+        display_badge="{eternal_x_mult:.1f}x M",
+        calculate_display_badge=lambda j, ctx: f"{j.custom_data['eternal_x_mult']:.1f}x M"
+    ),
+    "J_VAGABOND": Joker(
+        id="J_VAGABOND",
+        name="Vagabond",
+        description="Create a Tarot card if hand is played with $4 or less",
+        rarity="Rare",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                ctx.game.consumables.append(get_random_tarot_by_rarity(list(TAROT_DATABASE.items()))) if ctx.game.money <= 4 and len(ctx.game.consumables) < ctx.game.consumable_slots else None
+            ))
+        ]
+    ),
+    "J_MIDAS_MASK": Joker(
+        id="J_MIDAS_MASK",
+        name="Midas Mask",
+        description="All played Solid Rectangle cards become Gold when scored",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring.current_scoring_card, 'enhancement', "gold") if ctx.scoring.current_scoring_card.attributes[1] == 2 and ctx.scoring.current_scoring_card.attributes[3] == 0 else None
+            ))
+        ]
+    ),
+    "J_DRUNKARD": Joker(
+        id="J_DRUNKARD",
+        name="Drunkard",
+        description="+1 Discard",
+        rarity="Common",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_BUY_SELF, ability=lambda j, ctx: (
+                setattr(ctx.game, 'discards_remaining', ctx.game.discards_remaining + 1)
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_DESTROY_SELF, ability=lambda j, ctx: (
+                setattr(ctx.game, 'discards_remaining', ctx.game.discards_remaining - 1 if ctx.game.discards_remaining > 0 else 0)
+            ))
+        ]
+    ),
     "J_JUGGLER": Joker(
         id="J_JUGGLER",
-        name="The Juggler",
-        description="This Joker gains +1 Mult for every 2 cards on your board at end of round.",
-        rarity="Uncommon",
+        name="Juggler",
+        description="+1 Play",
+        rarity="Common",
         abilities=[
-            JokerAbility(trigger=JokerTrigger.END_OF_ROUND, ability=lambda j, ctx: setattr(j, 'eternal_mult', getattr(j, 'eternal_mult', 0) + len(ctx.game.board) // 2)),
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + getattr(j, 'eternal_mult', 0)))
+            JokerAbility(trigger=JokerTrigger.ON_BUY_SELF, ability=lambda j, ctx: (
+                setattr(ctx.game, 'boards_remaining', ctx.game.boards_remaining + 1)
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_DESTROY_SELF, ability=lambda j, ctx: (
+                setattr(ctx.game, 'boards_remaining', ctx.game.boards_remaining - 1 if ctx.game.boards_remaining > 0 else 0)
+            ))
         ]
     ),
-
-    "J_SCAVENGER": Joker(
-        id="J_SCAVENGER",
-        name="Scavenger",
-        description="+1 Mult permanently when a card is discarded.",
-        rarity="Uncommon",
+    "J_GOLDEN": Joker(
+        id="J_GOLDEN",
+        name="Golden Joker",
+        description="Earn $4 at end of round",
+        rarity="Common",
         abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_DISCARD, ability=lambda j, ctx: setattr(j, 'eternal_mult', getattr(j, 'eternal_mult', 0) + 1)),
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + getattr(j, 'eternal_mult', 0)))
+            JokerAbility(trigger=JokerTrigger.ON_END_OF_ROUND, ability=lambda j, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + 4)
+            ))
         ]
     ),
-
-    "J_ALCHEMIST": Joker(
-        id="J_ALCHEMIST",
-        name="The Alchemist",
-        description="Converts Chips into xMult at a rate of 100 Chips to x2 Mult.",
+    "J_BASEBALL": Joker(
+        id="J_BASEBALL",
+        name="Baseball Card",
+        description="x1.5 Mult for each Uncommon Joker held",
+        rarity="Uncommon",
+        custom_data={"n_uncommon_jokers": 0},
+        display_badge="x{n_uncommon_jokers:.2f} M",
+        calculate_display_badge=lambda j, ctx: f"x{j.custom_data['n_uncommon_jokers']:.2f} M",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * (1.5 + j.custom_data['n_uncommon_jokers']))
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_BUY_SELF, ability=lambda j, ctx: (
+                setattr(j.custom_data, 'n_uncommon_jokers', sum(1 for joker in ctx.game.jokers if joker.rarity == "Uncommon"))
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_DISCARD, ability=lambda j, ctx: (
+                setattr(j.custom_data, 'n_uncommon_jokers', sum(1 for joker in ctx.game.jokers if joker.rarity == "Uncommon"))
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_DESTROY_SELF, ability=lambda j, ctx: (
+                setattr(j.custom_data, 'n_uncommon_jokers', sum(1 for joker in ctx.game.jokers if joker.rarity == "Uncommon"))
+            ))
+        ]
+    ),
+    "J_BULL": Joker(
+        id="J_BULL",
+        name="Bull",
+        description="+2 Chips for each $1 you have",
+        rarity="Uncommon",
+        display_badge="+{chips} C",
+        calculate_display_badge=lambda j, ctx: f"+{2 * ctx.game.money} C",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 2 * ctx.game.money)
+            ))
+        ]
+    ),
+    "J_POPCORN": Joker(
+        id="J_POPCORN",
+        name="Popcorn",
+        description="+20 Mult, -4 Mult per round played",
+        rarity="Common",
+        custom_data={"rounds_played": 0},
+        display_badge="+{mult} M",
+        calculate_display_badge=lambda j, ctx: f"+{max(0, 20 - 4 * j.custom_data['rounds_played'])} M",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + max(0, 20 - 4 * j.custom_data['rounds_played']))
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_END_OF_ROUND, ability=lambda j, ctx: (
+                j.custom_data.update({'rounds_played': j.custom_data['rounds_played'] + 1}) if ctx.game.boards_remaining == 0 else None
+            )),
+        ]
+    ),
+    "J_ACROBAT": Joker(
+        id="J_ACROBAT",
+        name="Acrobat",
+        description="x3 Mult on final played set of the round",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if ctx.game.boards_remaining == 0 else None
+            ))
+        ]
+    ),
+    "J_ROUGH_GEM": Joker(
+        id="J_ROUGH_GEM",
+        name="Rough Gem",
+        description="Played Green cards earn $1",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + 1) if ctx.scoring.current_scoring_card.attributes[0] == 2 else None
+            ))
+        ]
+    ),
+    "J_BLOODSTONE": Joker(
+        id="J_BLOODSTONE",
+        name="Bloodstone",
+        description="Played Red cards have a 1 in 4 chance to give x1.5 Mult",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1.5) if ctx.scoring.current_scoring_card.attributes[0] == 0 and random.random() < 0.25 else None
+            ))
+        ]
+    ),
+    "J_ONYX": Joker(
+        id="J_ONYX",
+        name="Onyx",
+        description="Played Magenta cards give +50 Chips",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 50) if ctx.scoring.current_scoring_card.attributes[0] == 1 else None
+            ))
+        ]
+    ),
+    "J_FLOWER": Joker(
+        id="J_FLOWER",
+        name="Flower Pot",
+        description="x3 Mult if played set containsa Green, a Red, and a Magenta card",
+        rarity="Uncommon",
+        abilities=[
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if any(c.attributes[0] == 2 for c in ctx.game.scoring_cards) and
+                                                       any(c.attributes[0] == 0 for c in ctx.game.scoring_cards) and
+                                                       any(c.attributes[0] == 1 for c in ctx.game.scoring_cards) else None
+            ))
+        ]
+    ),
+    "J_WEE": Joker(
+        id="J_WEE",
+        name="Wee Joker",
+        description="This Joker gains +8 Chips for each played Single Triangle card",
+        custom_data={"chips": 0},
+        display_badge="+{chips} C",
+        calculate_display_badge=lambda j, ctx: f"+{j.custom_data['chips']} C",
         rarity="Rare",
         abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=j_alchemist_ability)
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
+                j.custom_data.update({'chips': j.custom_data['chips'] + 8}) if ctx.scoring.current_scoring_card.attributes[1] == 1 and ctx.scoring.current_scoring_card.attributes[3] == 0 else None
+            )),
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + j.custom_data['chips']) if j.custom_data['chips'] else None
+            ))
         ]
     ),
 
-    "J_LAST_STAND": Joker(
-        id="J_LAST_STAND",
-        name="Last Stand",
-        description="x4 Mult on your final set of the round.",
-        rarity="Uncommon",
-        abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=100, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 4) if ctx.game.boards_remaining == 1 else None)
-        ]
-    ),
 
-    "J_MIMIC": Joker(
-        id="J_MIMIC",
-        name="The Mimic",
-        description="Copies all scoring abilities of the Joker to its right.",
-        rarity="Rare",
-        abilities=[
-            # A high priority ensures it triggers after the joker it's copying might have modified itself.
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=110, ability=j_mimic_ability),
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, priority=110, ability=j_mimic_ability)
-        ]
-        # NOTE: This is a complex but very cool Joker. The helper function finds its own position and the joker to its right,
-        # then manually calls that joker's abilities.
-    ),
 
-    "J_GAMBLER": Joker(
-        id="J_GAMBLER",
-        name="Gambler",
-        description="50% chance to x3 Mult, 50% chance to set Mult to 1.",
-        rarity="Rare",
-        abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=200, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 3) if random.random() < 0.5 else setattr(ctx.scoring, 'additive_mult', -ctx.scoring.base_mult +1))
-        ]
-        # NOTE: To set Mult to 0, we set the additive_mult to be the negative of the base_mult.
-        # A very high priority ensures this is one of the last calculations.
-    ),
-
-    "J_OBSERVATORY": Joker(
-        id="J_OBSERVATORY",
-        name="Observatory",
-        description="Increases the level of the played Set type by an additional +1 after scoring.",
-        rarity="Uncommon",
-        abilities=[
-            # This uses the END_OF_ROUND trigger, assuming set levels are applied after a board is scored.
-            # If set leveling happens immediately, a new trigger like 'ON_SET_LEVEL_UP' might be needed.
-            # For now, this implementation assumes the set type is stored and can be accessed.
-            JokerAbility(trigger=JokerTrigger.END_OF_ROUND, ability=lambda j, ctx: setattr(ctx.game, 'set_type_levels', {**ctx.game.set_type_levels, ctx.scoring.set_type_string: ctx.game.set_type_levels.get(ctx.scoring.set_type_string, 0) + 1}) if ctx.scoring and ctx.scoring.set_type_string else None)
-        ]
-    ),
-    "J_OP_TEST_ONLY": Joker(id="J_OP_TEST_ONLY", name="OP Test Joker, DO NOT BUY", description="This is an OP test-only joker. +1000000 Chips and x1000 Mult", rarity="Legendary", abilities=[
-        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 1000000)),
-        JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, priority=1000, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1000))
-    ]),
 }
 
 TAROT_DATABASE = {
@@ -425,7 +799,7 @@ TAROT_DATABASE = {
     "T_THE_WHEEL_OF_FORTUNE": ConsumableCard(
         id="T_THE_WHEEL_OF_FORTUNE",
         name="The Wheel of Fortune",
-        description="Make one random card a copy of selected card.",
+        description="Make two random cards a copy of the selected card.",
         rarity="Uncommon",
         target_count=1,
         abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_wheel_of_fortune_ability)]
@@ -521,11 +895,16 @@ class GameState(BaseModel):
 
     def model_dump(self, **kwargs):
         """Custom model dump to exclude abilities from serialization."""
+        
+        update_joker_badges(self)
+        
         dump = super().model_dump(**kwargs)
+
         # Exclude the 'abilities' field from jokers and consumables as they are not JSON serializable
         if 'jokers' in dump:
             for joker in dump['jokers']:
                 joker.pop('abilities', None)
+                joker.pop('calculate_display_badge', None)  # Remove method references
         if 'consumables' in dump:
             for consumable in dump['consumables']:
                 consumable.pop('abilities', None)
@@ -534,6 +913,13 @@ class GameState(BaseModel):
         if 'pack_opening_state' in dump and dump['pack_opening_state']:
             # No un-serializable fields in PackOpeningState, but good practice
             pass
+        if 'shop_state' in dump:
+            for slot in dump['shop_state']['joker_slots']:
+                item = slot.get('item')
+                if item:
+                    item.pop('abilities', None)
+                    item.pop('calculate_display_badge', None)
+
         return dump
 
 GameContext.model_rebuild()
@@ -597,10 +983,10 @@ def get_random_joker_by_rarity(available_jokers: list[Joker]) -> Optional[Joker]
             pass
         case JokerVariant.FOIL:
             chosen_joker.variant = JokerVariant.FOIL
-            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 30)))
+            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 50)))
         case JokerVariant.HOLOGRAPHIC:
             chosen_joker.variant = JokerVariant.HOLOGRAPHIC
-            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3)))
+            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 10)))
         case JokerVariant.POLYCHROME:
             chosen_joker.variant = JokerVariant.POLYCHROME
             chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1.5)))
@@ -641,17 +1027,16 @@ def get_current_blind_info(game: GameState) -> dict[str, Any]:
         return {"name": "Unknown", "score_required": 999999}
     return {"name": ante_info["names"][game.current_blind_index], "score_required": ante_info["scores"][game.current_blind_index]}
 
-def trigger_joker_abilities(game: GameState, trigger: JokerTrigger, scoring_ctx: Optional[ScoringContext] = None):
-    active_jokers = game.jokers
-    if game.boss_blind_effect == "debuff_first_joker" and trigger == JokerTrigger.ON_SCORE_CALCULATION:
-        active_jokers = game.jokers[1:]
-    
+def trigger_joker_abilities(game_ctx: GameContext, trigger: JokerTrigger):
+    active_jokers = game_ctx.game.jokers
+    if game_ctx.game.boss_blind_effect == "debuff_first_joker" and trigger == JokerTrigger.ON_SCORE_CALCULATION:
+        active_jokers = game_ctx.game.jokers[1:]
+
+    scoring_ctx = game_ctx.scoring if game_ctx.scoring else None
+
     abilities_to_run = [(joker, ability) for joker in active_jokers for ability in joker.abilities if ability.trigger == trigger]
-    abilities_to_run.sort(key=lambda x: x[1].priority)
     
     print(f"Triggering {len(abilities_to_run)} joker abilities for trigger: {trigger.name}")
-
-    game_ctx = GameContext(game=game, scoring=scoring_ctx)
     
     # Determine trigger phase for logging
     trigger_phase = "end_scoring" if trigger == JokerTrigger.ON_SCORE_CALCULATION else "card_scoring"
@@ -717,3 +1102,9 @@ def trigger_consumable_abilities(game: GameState, consumable: ConsumableCard, tr
     abilities_to_run = [ability for ability in consumable.abilities if ability.trigger == trigger]
     for ability_def in abilities_to_run:
         ability_def.ability(consumable, game_ctx)
+
+def update_joker_badges(game: GameState):
+    ctx = GameContext(game=game, scoring=None)
+    for joker in game.jokers:
+        if joker.calculate_display_badge is not None:
+            joker.display_badge = joker.calculate_display_badge(joker, ctx)

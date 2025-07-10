@@ -61,6 +61,13 @@
                 Discards: <span id="discards-remaining">3</span>
             </div>
         </div>
+        <div id="controls">
+            <p>Order by:</p>
+            <button id="order-button-quantity">Quantity</button>
+            <button id="order-button-color">Color</button>
+            <button id="order-button-shape">Shape</button>
+            <button id="order-button-shading">Shading</button>
+        </div>
         
         <div id="end-run-container" style="display: none;">
              <button id="return-to-lobby-button">Back to Lobby</button>
@@ -96,16 +103,16 @@
         </div>
     </div>
 
-        <div id="error-dialog" class="hidden">
-            <div class="modal-content error-content">
-                <p class="error-message"></p>
-                <button class="error-close-btn">OK</button>
-            </div>
+    <div id="error-dialog" class="hidden">
+        <div class="modal-content error-content">
+            <p class="error-message"></p>
+            <button class="error-close-btn">OK</button>
         </div>
+    </div>
 
     <div id="tooltip" class="hidden"></div>
 
-        <script src="app.js" type="module"></script>
-        <script src="balatro.js" type="module"></script>
-    </body>
+    <script src="app.js" type="module"></script>
+    <script src="balatro.js" type="module"></script>
+</body>
 </html>

@@ -18,7 +18,7 @@ from balatro_set_core import get_current_blind_info, get_joker_by_name, get_rand
 from balatro_set_core import JOKER_DATABASE, TAROT_DATABASE, JOKER_RARITY_PRICES, ANTE_CONFIG, PACK_RARITIES, JOKER_VARIANT_PRICES_MULT
 from balatro_set_core import b_create_deck, b_is_set
 from balatro_set_core import Card, ShopSlot, PackOpeningChoice, PackOpeningState, BoosterPack, ShopState, GameState
-from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities
+from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities, update_joker_badges
 
 app = FastAPI()
 app.add_middleware(
@@ -230,6 +230,7 @@ async def get_state(id: str):
     if id not in GAME_SAVES:
         raise HTTPException(status_code=404, detail="Game not found.")
     current_game = GAME_SAVES[id]
+
     blind_info = get_current_blind_info(current_game)
     return {**current_game.model_dump(), "current_blind": blind_info["name"], "blind_score_required": blind_info["score_required"]}
 
@@ -336,7 +337,7 @@ async def play_set(request: PlaySetRequest, id: str, background_tasks: Backgroun
             ))
 
         # Trigger jokers for this card
-        trigger_joker_abilities(current_game, JokerTrigger.ON_SCORE_CARD, scoring_ctx)
+        trigger_joker_abilities(GameContext(game=current_game, scoring=scoring_ctx), JokerTrigger.ON_SCORE_CARD)
 
         # Apply card-specific multiplicative multipliers after jokers
         if card.enhancement == "x_mult":
@@ -367,7 +368,7 @@ async def play_set(request: PlaySetRequest, id: str, background_tasks: Backgroun
     scoring_ctx.current_scoring_card = None
     
     # After all cards, trigger jokers for the end of scoring
-    trigger_joker_abilities(current_game, JokerTrigger.ON_SCORE_CALCULATION, scoring_ctx)
+    trigger_joker_abilities(GameContext(game=current_game, scoring=scoring_ctx), JokerTrigger.ON_SCORE_CALCULATION)
 
     chips = scoring_ctx.base_chips + scoring_ctx.flat_chips
     mult = (scoring_ctx.base_mult + scoring_ctx.additive_mult) * scoring_ctx.multiplicative_mult
@@ -444,8 +445,11 @@ async def discard(request: DiscardRequest, id: str):
     
     selected_cards = [current_game.board[i] for i in request.card_indices]
     current_game.discard_pile.extend(selected_cards)
-    for i in sorted(request.card_indices, reverse=True): current_game.board.pop(i)
+    for i in sorted(request.card_indices, reverse=True):
+        current_game.board.pop(i)
     
+    trigger_joker_abilities(GameContext(game=current_game, selected_card_indices=request.card_indices), JokerTrigger.ON_DISCARD)
+
     draw_count = max(0, current_game.board_size - len(current_game.board))
     if len(current_game.deck) < draw_count:
         current_game.deck.extend(current_game.discard_pile)
@@ -480,9 +484,10 @@ async def buy_joker(request: BuyJokerRequest, id: str):
     
     current_game.money -= slot.price
     current_game.jokers.append(slot.item.copy())
-    if(slot.item.variant == JokerVariant.NEGATIVE):
+    if slot.item.variant == JokerVariant.NEGATIVE:
         current_game.joker_slots += 1
     slot.is_purchased = True
+    trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_BUY_JOKER)
     return {"game_state": current_game.model_dump()}
 
 @app.post("/api/balatro/sell_joker")
@@ -499,13 +504,15 @@ async def sell_joker(request: SellJokerRequest, id: str):
         raise HTTPException(status_code=400, detail="Invalid joker index.")
 
     joker_to_sell = current_game.jokers.pop(joker_index)
-    
+    # Trigger destroy-self abilities for the sold joker
+    for ability_def in joker_to_sell.abilities:
+        if ability_def.trigger == JokerTrigger.ON_DESTROY_SELF:
+            ability_def.ability(joker_to_sell, GameContext(game=current_game))
     # Sell price is half of the rarity price, rounded down
     sell_price = math.ceil(JOKER_RARITY_PRICES.get(joker_to_sell.rarity, 4) * JOKER_VARIANT_PRICES_MULT[joker_to_sell.variant]) // 2
     current_game.money += sell_price
-    if(joker_to_sell.variant == JokerVariant.NEGATIVE):
+    if joker_to_sell.variant == JokerVariant.NEGATIVE:
         current_game.joker_slots -= 1
-    
     return {"game_state": current_game.model_dump(), "message": f"Sold {joker_to_sell.name} for ${sell_price}."}
 
 @app.post("/api/balatro/buy_booster_pack")
@@ -632,7 +639,8 @@ async def use_consumable(request: UseConsumableRequest, id: str):
         selected_card_indices=request.target_card_indices or []
     )
     trigger_consumable_abilities(current_game, consumable, ConsumableTrigger.ON_USE, game_ctx)
-    
+    # Trigger jokers on consumable use
+    trigger_joker_abilities(game_ctx, JokerTrigger.ON_CONSUMABLE_USE)
     return {"game_state": current_game.model_dump(), "message": game_ctx.consumable.message}
 
 @app.post("/api/balatro/reorder_jokers")
@@ -664,9 +672,9 @@ async def leave_shop(id: str):
     current_game = GAME_SAVES[id]
 
     if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
-    
-    trigger_joker_abilities(current_game, JokerTrigger.END_OF_ROUND)
-    
+
+    trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_END_OF_ROUND)
+
     interest_cap = 5
     interest_earned = min(current_game.money // 5, interest_cap)
     current_game.money += interest_earned
@@ -764,11 +772,19 @@ async def get_saves():
         })
     return {"saves": blind_infos}
 
+@app.delete("/api/balatro/saves/{id}")
+async def delete_save(id: str):
+    if id not in GAME_SAVES:
+        raise HTTPException(status_code=404, detail="Save not found.")
+    del GAME_SAVES[id]
+    save_game_saves()
+    return {"ok": True, "message": f"Deleted save {id}"}
+
 def save_game_saves():
     print("Saving game saves...")
+
     with open("balatro-saves.json", "w") as f:
         json.dump({uid: game.model_dump() for uid, game in GAME_SAVES.items()}, f, indent=4)
-
 
 
 @app.get("/{path:path}")

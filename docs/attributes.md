@@ -3,6 +3,8 @@
 card: tuple[int, int, int, int]
 
 (color, shape, number, shading)
+   0      1      2        3
+
 
 ## color
 - 0: red

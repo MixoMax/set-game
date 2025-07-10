@@ -3,11 +3,11 @@
 :root {
     --card-width: 100px;
     --card-height: 150px;
-    --card-border-radius: 0; /* Changed */
-    --card-bg-color: linear-gradient(145deg, #ffffff, #f0f0f0); /* Changed */
-    --card-border-color: #000; /* Changed */
-    --card-selected-color: #4a90e2; /* Changed */
-    --joker-common: #000; /* Changed */
+    --card-border-radius: 0;
+    --card-bg-color: linear-gradient(145deg, #ffffff, #f0f0f0);
+    --card-border-color: #000;
+    --card-selected-color: #4a90e2;
+    --joker-common: #000;
     --joker-uncommon: #4caf50;
     --joker-rare: #2196f3;
     --joker-legendary: #ff9800;
@@ -213,15 +213,13 @@ body {
 
 /* Rarity colors are applied to border */
 
-.eternal-mult {
+.joker-badge {
     position: absolute;
     top: -10px;
     right: -10px;
     background-color: #ffc107;
     color: #212529;
     border: 2px solid #000;
-    width: 24px;
-    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -510,9 +508,6 @@ body {
 
 #error-dialog.hidden {
     display: none;
-}
-#error-dialog {
-    /* Uses .modal styles */
 }
 
 /* Shop Area */
@@ -1047,7 +1042,7 @@ body {
     text-align: left;
 }
 
-.continue-button {
+.continue-button, .delete-button {
     font-family: 'Press Start 2P', cursive;
     padding: 10px 20px;
     font-size: 0.8em;
@@ -1061,7 +1056,7 @@ body {
     white-space: nowrap;
 }
 
-.continue-button:hover {
+.continue-button:hover, .delete-button:hover {
     transform: translate(2px, 2px);
     box-shadow: 2px 2px 0 #000;
 }
