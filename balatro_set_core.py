@@ -583,7 +583,7 @@ def get_random_joker_by_rarity(available_jokers: list[Joker]) -> Optional[Joker]
     chosen_joker: Joker = random.choice(jokers_by_rarity[chosen_rarity])
 
     variant_weights = {
-        JokerVariant.BASIC: 80,
+        JokerVariant.BASIC: 75,
         JokerVariant.FOIL: 10,
         JokerVariant.HOLOGRAPHIC: 7,
         JokerVariant.POLYCHROME: 5,
