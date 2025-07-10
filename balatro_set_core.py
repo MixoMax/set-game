@@ -107,42 +107,9 @@ class ConsumableCard(BaseModel):
 
 #%% --- Game Logic ---
 
-def enhance_selected_cards(ctx: GameContext, enhancement: str) -> int:
-    """Helper function to enhance selected cards on board."""
-    game_state = ctx.game
-    indices = ctx.selected_card_indices
-    
-    if not indices:
-        return 0
-    
-    enhanced_count = 0
-    for i in indices:
-        if 0 <= i < len(game_state.board):
-            game_state.board[i].enhancement = enhancement
-            enhanced_count += 1
-    
-    if enhanced_count > 0:
-        plural = "s" if enhanced_count > 1 else ""
-        ctx.consumable.message = f"Enhanced {enhanced_count} selected card{plural}."
+JOKER_RARITY_PRICES = {"Common": 4, "Uncommon": 6, "Rare": 8, "Legendary": 10}
+JOKER_VARIANT_PRICES_MULT = {JokerVariant.BASIC: 1, JokerVariant.FOIL: 1.15, JokerVariant.HOLOGRAPHIC: 1.3, JokerVariant.POLYCHROME: 1.45, JokerVariant.NEGATIVE: 1.6}
 
-    return enhanced_count
-
-def enhance_random_cards(game_state: 'GameState', count: int, enhancement: str) -> int:
-    """Helper function to enhance random cards on board."""
-    # Ensure there are cards to enhance
-    if not game_state.board:
-        return 0
-    # Ensure count is not greater than the number of cards on board
-    actual_count = min(count, len(game_state.board))
-    indices_to_enhance = random.sample(range(len(game_state.board)), actual_count)
-    for i in indices_to_enhance:
-        game_state.board[i].enhancement = enhancement
-    return len(indices_to_enhance)
-
-def change_card_colors(game_state: 'GameState', color: int):
-    """Change all cards on the board to a single color."""
-    for card in game_state.board:
-        card.attributes[0] = color  # Change the first attribute to the new color
 
 def get_joker_by_name(game_state: 'GameState', name: str) -> Optional['Joker']:
     """Finds a joker instance by its name."""
@@ -150,7 +117,6 @@ def get_joker_by_name(game_state: 'GameState', name: str) -> Optional['Joker']:
         if j.name == name:
             return j
     return None
-
 
 def retrieve_from_discard(game_state: 'GameState', count: int):
     """Retrieves random cards from the discard pile back to board."""
@@ -164,36 +130,34 @@ def retrieve_from_discard(game_state: 'GameState', count: int):
         game_state.discard_pile.remove(card_to_retrieve)
         game_state.board.append(card_to_retrieve)
 
-def t_wheel_of_fortune_ability(card: 'Card', ctx: 'GameContext'):
-    """Make two random cards a copy of selected card."""
 
-    game_state = ctx.game
-    indices = ctx.selected_card_indices
-    
-    if not indices:
-        return 0
+def add_random_tarot(game_state: 'GameState', number: int = 1):
+    """Adds a random tarot card to the game."""
+    for _ in range(number):
+        if len(game_state.consumables) < game_state.consumable_slots:
+            random_idx = random.randint(0, len(TAROT_DATABASE) - 1)
+            card = TAROT_DATABASE.values()[random_idx].copy()
+            game_state.consumables.append(card)
 
-    if len(indices) != 1:
-        ctx.consumable.message = "Please select exactly one card to copy."
-        return 0
-    
-    selected_index = indices[0]
-    if selected_index < 0 or selected_index >= len(game_state.board):
-        ctx.consumable.message = "Selected card index is out of bounds."
-        return 0
-    
-    selected_card = game_state.board[selected_index]
+def t_wheel_ability(c: ConsumableCard, ctx: GameContext):
+    if ctx.game.jokers:
+        random_joker = random.choice(ctx.game.jokers)
+        if random_joker.variant == JokerVariant.BASIC and random.random() < 0.25:
+            new_variant = random.choice(list(JOKER_VARIANT_PRICES_MULT.keys()))
+            random_joker.variant = new_variant
+            random_joker.price = int(random_joker.price * JOKER_VARIANT_PRICES_MULT[new_variant])
 
-    random_card_ids = random.sample(range(len(game_state.board)), 2)
-    for i in random_card_ids:
-        if i != selected_index:
-            game_state.board[i] = Card(
-                attributes=selected_card.attributes.copy(),
-                enhancement=selected_card.enhancement
-            )
-
-    return 1
-
+def t_death_ability(c: ConsumableCard, ctx: GameContext):
+    """Turns 2 random other cards into a copy of 1 selected card."""
+    if len(ctx.game.selected_card_indices) == 1:
+        selected_card = ctx.game.deck[ctx.game.selected_card_indices[0]]
+        for _ in range(2):
+            if len(ctx.game.deck) < ctx.game.board_size:
+                random_idx = random.randint(0, len(ctx.game.deck) - 1)
+                if random_idx not in ctx.game.selected_card_indices:
+                    ctx.game.deck[random_idx] = selected_card.copy()
+            else:
+                break
 
 
 JOKER_DATABASE = {
@@ -386,7 +350,7 @@ JOKER_DATABASE = {
         rarity="Common",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
-                ctx.game.consumables.append(get_random_tarot_by_rarity(list(TAROT_DATABASE.items()))) if random.random() < 0.25 and len(ctx.game.consumables) < ctx.game.consumable_slots else None
+                add_random_tarot(ctx.game, 1) if random.random() < 0.25 else None
             ))
         ]
     ),
@@ -464,8 +428,8 @@ JOKER_DATABASE = {
         description="Create a Tarot card when scoring a set with a striped green card",
         rarity="Rare",
         abilities=[
-            JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
-                create_tarot_card(ctx.game) if any(c.attributes[0] == 2 and c.attributes[3] == 1 for c in ctx.game.scoring_cards) else None
+            JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
+                add_random_tarot(ctx.game, 1) if any(c.attributes[0] == 2 and c.attributes[3] == 1 for c in ctx.game.scoring_cards) else None
             ))
         ]
     ),
@@ -496,7 +460,7 @@ JOKER_DATABASE = {
         rarity="Rare",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: (
-                ctx.game.consumables.append(get_random_tarot_by_rarity(list(TAROT_DATABASE.items()))) if ctx.game.money <= 4 and len(ctx.game.consumables) < ctx.game.consumable_slots else None
+                add_random_tarot(ctx.game, 1) if ctx.game.money <= 4 else None
             ))
         ]
     ),
@@ -628,11 +592,11 @@ JOKER_DATABASE = {
     "J_BLOODSTONE": Joker(
         id="J_BLOODSTONE",
         name="Bloodstone",
-        description="Played Red cards have a 1 in 4 chance to give x1.5 Mult",
+        description="Played Red cards have a 1 in 2 chance to give x1.5 Mult",
         rarity="Uncommon",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
-                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1.5) if ctx.scoring.current_scoring_card.attributes[0] == 0 and random.random() < 0.25 else None
+                setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1.5) if ctx.scoring.current_scoring_card.attributes[0] == 0 and random.random() < 0.5 else None
             ))
         ]
     ),
@@ -677,149 +641,215 @@ JOKER_DATABASE = {
             ))
         ]
     ),
-
-
-
 }
 
 TAROT_DATABASE = {
-    "T_THE_EMPRESS": ConsumableCard(
-        id="T_THE_EMPRESS",
+    "T_FOOL": ConsumableCard(
+        id="T_FOOL",
+        name="The Fool",
+        description="Creates a copy of the last used Tarot or Planet card.",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                ctx.game.consumables.append(ctx.game.last_consumable_used.copy() if ctx.game.last_consumable_used else None)
+            ))
+        ]
+    ),
+
+    "T_MAGICIAN": ConsumableCard(
+        id="T_MAGICIAN",
+        name="The Magician",
+        description="Enhances 2 selected cards to Lucky Cards.",
+        tooltip="(Lucky: 1 in 5 chance for +20 Mult, 1 in 15 chance to win $20)",
+        rarity="Common",
+        target_count=2,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'lucky') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
+    ),
+    
+    "T_HIGH_PRIESTESS": ConsumableCard(
+        id="T_HIGH_PRIESTESS",
+        name="The High Priestess",
+        description="Does Nothing yet.",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                None  # Placeholder for future functionality
+            ))
+        ]
+    ),
+    "T_EMPRESS": ConsumableCard(
+        id="T_EMPRESS",
         name="The Empress",
-        description="Enhance 2 random cards to +30 Chips each.",
+        description="Enhances 2 selected cards to Mult Cards.",
+        tooltip="(Mult: +4 Mult)",
         rarity="Common",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_random_cards(ctx.game, 2, "bonus_chips"))]
+        target_count=2,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'mult') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
     ),
-
-    "T_THE_HIEROPHANT": ConsumableCard(
-        id="T_THE_HIEROPHANT",
+    "T_EMPEROR": ConsumableCard(
+        id="T_EMPEROR",
+        name="The Emperor",
+        description="Creates 2 random Tarot cards.",
+        tooltip="(must have room)",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                add_random_tarot(ctx.game, 2) # function takes care of room check
+            ))
+        ]
+    ),
+    "T_HIEROPHANT": ConsumableCard(
+        id="T_HIEROPHANT",
         name="The Hierophant",
-        description="Enhance 2 random cards to +2 Mult each.",
+        description="Enhances 2 selected cards to Bonus Cards.",
+        tooltip="(Bonus: +30 Chips)",
         rarity="Common",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_random_cards(ctx.game, 2, "bonus_mult"))]
+        target_count=2,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'bonus') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
     ),
-
-    "T_THE_TOWER": ConsumableCard(
-        id="T_THE_TOWER",
-        name="The Tower",
-        description="Enhance 1 random card to x1.5 Mult.",
-        rarity="Uncommon",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_random_cards(ctx.game, 1, "x_mult"))]
-    ),
-
-    "T_THE_SUN": ConsumableCard(
-        id="T_THE_SUN",
-        name="The Sun",
-        description="Enhance 2 random cards to become Gold.",
-        rarity="Uncommon",
-        tooltip="(Gold: +3 money when scored)",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_random_cards(ctx.game, 2, "gold"))]
-    ),
-
-    "T_THE_WORLD": ConsumableCard(
-        id="T_THE_WORLD",
-        name="The World",
-        description="Make all cards on the board any random single color.",
-        rarity="Rare",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: change_card_colors(ctx.game, random.choice([0, 1, 2])))]
-    ),
-
-    "T_JUDGEMENT": ConsumableCard(
-        id="T_JUDGEMENT",
-        name="Judgement",
-        description="Retrieve 3 random cards from your discard pile.",
+    "T_LOVERS": ConsumableCard(
+        id="T_LOVERS",
+        name="The Lovers",
+        description="Enhances 1 selected card into a Wild Card.",
+        tooltip="(Wild: Can be used as any card)",
         rarity="Common",
-        tooltip="Adds cards from the discard pile to your board. Limited by board size.",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: retrieve_from_discard(ctx.game, 3))]
+        target_count=1,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'attributes', [-1, -1, -1, -1]) for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
     ),
-
-    "T_THE_DEVIL": ConsumableCard(
-        id="T_THE_DEVIL",
-        name="The Devil",
-        description="Gain $15, but destroy a random Joker.",
-        rarity="Rare",
-        tooltip="The Joker is permanently lost. Cannot be used if you have no Jokers.",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
-            setattr(ctx.game, 'money', ctx.game.money + 15),
-            ctx.game.jokers.pop(random.randrange(len(ctx.game.jokers)))
-        ) if ctx.game.jokers else None)]
+    "T_CHARIOT": ConsumableCard(
+        id="T_CHARIOT",
+        name="The Chariot",
+        description="Enhances 1 selected card into a Steel Card.",
+        tooltip="(Steel: x1.5 Mult while this card stays on the board)",
+        rarity="Common",
+        target_count=1,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'steel') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
     ),
-
+    "T_JUSTICE": ConsumableCard(
+        id="T_JUSTICE",
+        name="Justice",
+        description="Enhances 1 selected card into a Glass Card.",
+        tooltip="(x2 Mult, 1 in 4 chance to be destroyed when played)",
+        rarity="Common",
+        target_count=1,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'glass') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
+    ),
+    "T_HERMIT": ConsumableCard(
+        id="T_HERMIT",
+        name="The Hermit",
+        description="Doubles Money (Max of $20)",
+        tooltip="(Max $20)",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + min(20, max(0, ctx.game.money)))
+            ))
+        ]
+    ),
+    "T_WHEEL_OF_FORTUNE": ConsumableCard(
+        id="T_WHEEL_OF_FORTUNE",
+        name="Wheel of Fortune",
+        description="1 in 4 chance to add Foil, Holographic, or Polychrome edition to a random joker.",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_wheel_ability)
+        ]
+    ),
     "T_STRENGTH": ConsumableCard(
         id="T_STRENGTH",
         name="Strength",
-        description="Enhance 1 random card to double the effect of other card enhancements in the scored set.",
-        rarity="Rare",
-        tooltip="(Ex: A +30 Chip card will give +60 Chips if this card is in the set)",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_random_cards(ctx.game, 1, "amplify"))]
-        # NOTE: This requires new logic in your scoring function to handle the 'amplify' enhancement.
-    ),
-
-    "T_THE_FOOL": ConsumableCard(
-        id="T_THE_FOOL",
-        name="The Fool",
-        description="Create 1 'Wildcard'.",
-        rarity="Uncommon",
-        tooltip="(Wildcard: Can be part of any Set. Provides no Chips or Mult itself)",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
-            ctx.game.board.append(Card(attributes=[-1,-1,-1,-1], enhancement='wildcard'))
-        ) if len(ctx.game.board) < ctx.game.board_size else None)]
-        # NOTE: This requires your `is_set` logic to recognize the special [-1,-1,-1,-1] attributes as a wildcard.
-    ),
-
-    "T_THE_HERMIT": ConsumableCard(
-        id="T_THE_HERMIT",
-        name="The Hermit",
-        description="Gain +1 Board and +1 Discard for the current round.",
+        description="Does Nothing yet.",
         rarity="Common",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
-            setattr(ctx.game, 'boards_remaining', ctx.game.boards_remaining + 1),
-            setattr(ctx.game, 'discards_remaining', ctx.game.discards_remaining + 1)
-        ))]
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: None)
+        ]
     ),
-
-    "T_THE_LOVERS": ConsumableCard(
-        id="T_THE_LOVERS",
-        name="The Lovers",
-        description="Enhance 1 selected card to +30 Chips.",
-        rarity="Common",
-        target_count=1,
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_selected_cards(ctx, "bonus_chips"))]
-    ),
-
-    "T_THE_CHARIOT": ConsumableCard(
-        id="T_THE_CHARIOT",
-        name="The Chariot",
-        description="Enhance 1 selected card to +2 Mult.",
-        rarity="Common",
-        target_count=1,
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: enhance_selected_cards(ctx, "bonus_mult"))]
-    ),
-
-    "T_THE_WHEEL_OF_FORTUNE": ConsumableCard(
-        id="T_THE_WHEEL_OF_FORTUNE",
-        name="The Wheel of Fortune",
-        description="Make two random cards a copy of the selected card.",
-        rarity="Uncommon",
-        target_count=1,
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_wheel_of_fortune_ability)]
-    ),
-
-    "T_THE_HANGED_MAN": ConsumableCard(
-        id="T_THE_HANGED_MAN",
+    "T_HANGED": ConsumableCard(
+        id="T_HANGED",
         name="The Hanged Man",
-        description="Gain 1 extra turn.",
-        rarity="Rare",
-        abilities=[ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
-            setattr(ctx.game, 'extra_turns', ctx.game.extra_turns + 1)
-        ))]
-    )
+        description="Destroys 2 selected cards.",
+        rarity="Common",
+        target_count=2,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [ctx.game.deck.pop(i) for i in sorted(ctx.game.selected_card_indices, reverse=True) if i < len(ctx.game.deck)]
+            ))
+        ]
+    ),
+    "T_DEATH": ConsumableCard(
+        id="T_DEATH",
+        name="Death",
+        description="Turns 2 random other cards into a copy of 1 selected card.",
+        rarity="Common",
+        target_count=1,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=t_death_ability)
+        ]
+    ),
+    "T_TEMPERANCE": ConsumableCard(
+        id="T_TEMPERANCE",
+        name="Temperance",
+        description="Gives the total sell value of all current Jokers.",
+        tooltip="(Max of $50)",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                setattr(ctx.game, 'money', ctx.game.money + min(50, sum(joker.price for joker in ctx.game.jokers)))
+            ))
+        ]
+    ),
+    "T_DEVIL": ConsumableCard(
+        id="T_DEVIL",
+        name="The Devil",
+        description="Enhances 1 selected card into a Gold Card.",
+        tooltip="(Gold: Earn $3 if this card is on board at end of round)",
+        rarity="Common",
+        target_count=1,
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                [setattr(ctx.game.deck[i], 'enhancement', 'gold') for i in ctx.game.selected_card_indices if i < len(ctx.game.deck)]
+            ))
+        ]
+    ),
+    "T_TOWER": ConsumableCard(
+        id="T_TOWER",
+        name="The Tower",
+        description="Does Nothing yet.",
+        rarity="Common",
+        abilities=[
+            ConsumableAbility(trigger=ConsumableTrigger.ON_USE, ability=lambda c, ctx: (
+                None  # Placeholder for future functionality
+            ))
+        ]
+    ),
 }
 
-JOKER_RARITY_PRICES = {"Common": 4, "Uncommon": 6, "Rare": 8, "Legendary": 10}
-JOKER_VARIANT_PRICES_MULT = {JokerVariant.BASIC: 1, JokerVariant.FOIL: 1.15, JokerVariant.HOLOGRAPHIC: 1.3, JokerVariant.POLYCHROME: 1.45, JokerVariant.NEGATIVE: 1.6}
-
-def b_create_deck(): return [list(p) for p in itertools.product(range(3), repeat=4)]
+def b_create_deck():
+    return [list(p) for p in itertools.product(range(3), repeat=4)]
 
 def b_is_set(cards: List[List[int]]):
     if len(cards) != 3: return False
@@ -995,26 +1025,6 @@ def get_random_joker_by_rarity(available_jokers: list[Joker]) -> Optional[Joker]
 
     return chosen_joker
 
-
-def get_random_tarot_by_rarity(available_tarots: list[tuple[str, ConsumableCard]]) -> Optional[tuple[str, ConsumableCard]]:
-    """Selects a random tarot card based on weighted rarity."""
-    if not available_tarots:
-        return None
-
-    rarity_weights = { "Common": 70, "Uncommon": 25, "Rare": 5 }
-
-    tarots_by_rarity = {rarity: [] for rarity in rarity_weights.keys()}
-    for key, tarot in available_tarots:
-        if tarot.rarity in tarots_by_rarity:
-            tarots_by_rarity[tarot.rarity].append((key, tarot))
-
-    possible_rarities = [r for r, t_list in tarots_by_rarity.items() if t_list]
-    if not possible_rarities:
-        return None
-
-    weights = [rarity_weights[r] for r in possible_rarities]
-    chosen_rarity = random.choices(possible_rarities, weights=weights, k=1)[0]
-    return random.choice(tarots_by_rarity[chosen_rarity])
 
 def get_random_pack_rarity():
     rarities = list(PACK_RARITIES.keys())
