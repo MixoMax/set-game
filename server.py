@@ -14,7 +14,7 @@ import math
 from uuid import uuid4
 
 from balatro_set_core import JokerTrigger, ConsumableTrigger, ScoreLogEntry, ScoringContext, ConsumableContext, GameContext, JokerAbility, ConsumableAbility, Joker, ConsumableCard, JokerVariant
-from balatro_set_core import get_current_blind_info, get_joker_by_name, get_random_joker_by_rarity, get_random_pack_rarity, get_random_tarot_by_rarity
+from balatro_set_core import get_current_blind_info, get_joker_by_name, get_random_joker_by_rarity, get_random_pack_rarity
 from balatro_set_core import JOKER_DATABASE, TAROT_DATABASE, JOKER_RARITY_PRICES, ANTE_CONFIG, PACK_RARITIES, JOKER_VARIANT_PRICES_MULT
 from balatro_set_core import b_create_deck, b_is_set
 from balatro_set_core import Card, ShopSlot, PackOpeningChoice, PackOpeningState, BoosterPack, ShopState, GameState
@@ -557,10 +557,12 @@ async def buy_booster_pack(request: BuyBoosterRequest, id: str):
         
         pack_choices = []
         for _ in range(rarity_info['show']):
-            if not available_tarots: break
+            if not available_tarots:
+                break
             
-            result = get_random_tarot_by_rarity(available_tarots)
-            if not result: continue
+            result = random.choice(available_tarots)
+            if not result:
+                continue
             chosen_key, chosen_card = result
             
             pack_choices.append(PackOpeningChoice(id=chosen_key, name=chosen_card.name, description=chosen_card.description))
