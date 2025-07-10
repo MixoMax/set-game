@@ -10,11 +10,12 @@ import sys
 import os
 import json
 import itertools
+import math
 from uuid import uuid4
 
-from balatro_set_core import JokerTrigger, ConsumableTrigger, ScoreLogEntry, ScoringContext, ConsumableContext, GameContext, JokerAbility, ConsumableAbility, Joker, ConsumableCard
+from balatro_set_core import JokerTrigger, ConsumableTrigger, ScoreLogEntry, ScoringContext, ConsumableContext, GameContext, JokerAbility, ConsumableAbility, Joker, ConsumableCard, JokerVariant
 from balatro_set_core import get_current_blind_info, get_joker_by_name, get_random_joker_by_rarity, get_random_pack_rarity, get_random_tarot_by_rarity
-from balatro_set_core import JOKER_DATABASE, TAROT_DATABASE, JOKER_RARITY_PRICES, ANTE_CONFIG, PACK_RARITIES
+from balatro_set_core import JOKER_DATABASE, TAROT_DATABASE, JOKER_RARITY_PRICES, ANTE_CONFIG, PACK_RARITIES, JOKER_VARIANT_PRICES_MULT
 from balatro_set_core import b_create_deck, b_is_set
 from balatro_set_core import Card, ShopSlot, PackOpeningChoice, PackOpeningState, BoosterPack, ShopState, GameState
 from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities
@@ -406,7 +407,7 @@ async def play_set(request: PlaySetRequest, id: str, background_tasks: Backgroun
 
             available_jokers = [j for j in available_jokers if j.name != joker_to_add.name]
 
-            price = JOKER_RARITY_PRICES.get(joker_to_add.rarity, 4)
+            price = math.ceil(JOKER_RARITY_PRICES.get(joker_to_add.rarity, 4) * JOKER_VARIANT_PRICES_MULT[joker_to_add.variant])
             current_game.shop_state.joker_slots.append(ShopSlot(item=joker_to_add, price=price))
         current_game.shop_state.booster_pack_slots.append(BoosterPack(name="Celestial Pack", price=4))
         current_game.shop_state.booster_pack_slots.append(BoosterPack(name="Tarot Pack", price=3))
@@ -479,6 +480,8 @@ async def buy_joker(request: BuyJokerRequest, id: str):
     
     current_game.money -= slot.price
     current_game.jokers.append(slot.item.copy())
+    if(slot.item.variant == JokerVariant.NEGATIVE):
+        current_game.joker_slots += 1
     slot.is_purchased = True
     return {"game_state": current_game.model_dump()}
 
@@ -498,8 +501,10 @@ async def sell_joker(request: SellJokerRequest, id: str):
     joker_to_sell = current_game.jokers.pop(joker_index)
     
     # Sell price is half of the rarity price, rounded down
-    sell_price = JOKER_RARITY_PRICES.get(joker_to_sell.rarity, 4) // 2
+    sell_price = math.ceil(JOKER_RARITY_PRICES.get(joker_to_sell.rarity, 4) * JOKER_VARIANT_PRICES_MULT[joker_to_sell.variant]) // 2
     current_game.money += sell_price
+    if(joker_to_sell.variant == JokerVariant.NEGATIVE):
+        current_game.joker_slots -= 1
     
     return {"game_state": current_game.model_dump(), "message": f"Sold {joker_to_sell.name} for ${sell_price}."}
 
