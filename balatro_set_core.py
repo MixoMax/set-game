@@ -15,6 +15,13 @@ class JokerTrigger(Enum):
 class ConsumableTrigger(Enum):
     ON_USE = "on_use"
 
+class JokerVariant(str, Enum):
+    BASIC = "basic"
+    FOIL = "foil"
+    HOLOGRAPHIC = "holographic"
+    POLYCHROME = "polychrome"
+    NEGATIVE = "negative"
+
 class ScoreLogEntry(BaseModel):
     source_type: str # 'set', 'card', 'joker'
     source_name: str
@@ -66,6 +73,7 @@ class Joker(BaseModel):
     name: str
     description: str
     rarity: str
+    variant: JokerVariant = JokerVariant.BASIC
     eternal_mult: int = 0
     abilities: List[JokerAbility] = Field([], exclude=True)
 
@@ -435,6 +443,7 @@ TAROT_DATABASE = {
 }
 
 JOKER_RARITY_PRICES = {"Common": 4, "Uncommon": 6, "Rare": 8, "Legendary": 10}
+JOKER_VARIANT_PRICES_MULT = {JokerVariant.BASIC: 1, JokerVariant.FOIL: 1.15, JokerVariant.HOLOGRAPHIC: 1.3, JokerVariant.POLYCHROME: 1.45, JokerVariant.NEGATIVE: 1.6}
 
 def b_create_deck(): return [list(p) for p in itertools.product(range(3), repeat=4)]
 
@@ -571,7 +580,35 @@ def get_random_joker_by_rarity(available_jokers: list[Joker]) -> Optional[Joker]
 
     weights = [rarity_weights[r] for r in possible_rarities]
     chosen_rarity = random.choices(possible_rarities, weights=weights, k=1)[0]
-    return random.choice(jokers_by_rarity[chosen_rarity])
+    chosen_joker: Joker = random.choice(jokers_by_rarity[chosen_rarity])
+
+    variant_weights = {
+        JokerVariant.BASIC: 80,
+        JokerVariant.FOIL: 10,
+        JokerVariant.HOLOGRAPHIC: 7,
+        JokerVariant.POLYCHROME: 5,
+        JokerVariant.NEGATIVE: 3
+    }
+
+    chosen_variant = random.choices(list(variant_weights.keys()), weights=list(variant_weights.values()),k=1)[0]
+
+    match chosen_variant:
+        case JokerVariant.BASIC:
+            pass
+        case JokerVariant.FOIL:
+            chosen_joker.variant = JokerVariant.FOIL
+            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'flat_chips', ctx.scoring.flat_chips + 30)))
+        case JokerVariant.HOLOGRAPHIC:
+            chosen_joker.variant = JokerVariant.HOLOGRAPHIC
+            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3)))
+        case JokerVariant.POLYCHROME:
+            chosen_joker.variant = JokerVariant.POLYCHROME
+            chosen_joker.abilities.append(JokerAbility(trigger=JokerTrigger.ON_SCORE_CALCULATION, ability=lambda j, ctx: setattr(ctx.scoring, 'multiplicative_mult', ctx.scoring.multiplicative_mult * 1.5)))
+        case JokerVariant.NEGATIVE:
+            chosen_joker.variant = JokerVariant.NEGATIVE
+
+    return chosen_joker
+
 
 def get_random_tarot_by_rarity(available_tarots: list[tuple[str, ConsumableCard]]) -> Optional[tuple[str, ConsumableCard]]:
     """Selects a random tarot card based on weighted rarity."""

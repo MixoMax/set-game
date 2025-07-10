@@ -306,6 +306,42 @@ function renderJoker(joker, index, context = 'player') {
         jokerEl.appendChild(sellButton);
     }
 
+    console.log(`Rendering joker: ${joker.name} (ID: ${joker.id}, Variant: ${joker.variant})`);
+    if (joker.variant != "basic") {
+        const variantEL = document.createElement('div');
+        variantEL.classList.add('variant-overlay');
+
+        let text = '';
+        let title = '';
+
+        switch (joker.variant) {
+            case 'foil':
+                text = '+30 C';
+                title = "Foil: +30 Chips";
+                break;
+            case 'holographic':
+                text = '+3 M';
+                title = "Holographic: +3 Mult";
+                break;
+            case 'polychrome':
+                text = 'x1.5 M';
+                title = 'Polychrome: x1.5 Mult';
+                break;
+            case 'negative':
+                text = 'NEGATIVE';
+                title = "Negative: Grants one additional joker slot"
+                break;
+        }
+
+        if (text) {
+            variantEL.textContent = text;
+            variantEL.title = title;
+            variantEL.classList.add(joker.variant.toLowerCase());
+            variantEL.top = "20%";
+            jokerEl.appendChild(variantEL);
+        }
+    }
+
     return jokerEl;
 }
 
