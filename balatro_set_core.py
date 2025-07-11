@@ -12,13 +12,14 @@ class JokerTrigger(Enum):
     ON_END_OF_ROUND = "on_end_of_round"
     ON_DISCARD = "on_discard"
 
-    # TODO: Implement these triggers
     ON_CONSUMABLE_USE = "on_consumable_use"
     ON_BUY_SELF = "on_buy_self"
     ON_DESTROY_SELF = "on_destroy_self"
 
+    # TODO: Implement these
     ON_BUY_JOKER = "on_buy_joker"
     ON_DESTROY_JOKER = "on_destroy_joker"
+    ON_START_ROUND = "on_start_round"
 
 
 class ConsumableTrigger(Enum):
@@ -94,6 +95,8 @@ class Joker(BaseModel):
     def copy(self, **kwargs):
         new_abilities = [a.copy(deep=True) for a in self.abilities]
         return super().copy(update={'abilities': new_abilities}, **kwargs)
+    
+    
 
 class ConsumableCard(BaseModel):
     id: str
@@ -180,7 +183,7 @@ JOKER_DATABASE = {
         rarity="Common",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
-                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 0 else None
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 2 else None
             ))
         ]
     ),
@@ -191,7 +194,7 @@ JOKER_DATABASE = {
         rarity="Common",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
-                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 1 else None
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 0 else None
             ))
         ]
     ),
@@ -202,7 +205,7 @@ JOKER_DATABASE = {
         rarity="Common",
         abilities=[
             JokerAbility(trigger=JokerTrigger.ON_SCORE_CARD, ability=lambda j, ctx: (
-                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 2 else None
+                setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + 3) if ctx.scoring.current_scoring_card.attributes[0] == 1 else None
             ))
         ]
     ),
@@ -563,7 +566,7 @@ JOKER_DATABASE = {
                 setattr(ctx.scoring, 'additive_mult', ctx.scoring.additive_mult + max(0, 20 - 4 * j.custom_data['rounds_played']))
             )),
             JokerAbility(trigger=JokerTrigger.ON_END_OF_ROUND, ability=lambda j, ctx: (
-                j.custom_data.update({'rounds_played': j.custom_data['rounds_played'] + 1}) if ctx.game.boards_remaining == 0 else None
+                j.custom_data.update({'rounds_played': j.custom_data['rounds_played'] + 1})
             )),
         ]
     ),
@@ -932,9 +935,10 @@ class GameState(BaseModel):
 
         # Exclude the 'abilities' field from jokers and consumables as they are not JSON serializable
         if 'jokers' in dump:
-            for joker in dump['jokers']:
+            for idx, joker in enumerate(dump['jokers']):
                 joker.pop('abilities', None)
-                joker.pop('calculate_display_badge', None)  # Remove method references
+                joker.pop('calculate_display_badge', None)
+                joker["custom_data"] = self.jokers[idx].custom_data  # Ensure custom data is included
         if 'consumables' in dump:
             for consumable in dump['consumables']:
                 consumable.pop('abilities', None)

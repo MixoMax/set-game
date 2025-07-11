@@ -46,6 +46,8 @@ if os.path.exists("balatro-saves.json"):
         for uid, game_data in data.items():
             joker_data = game_data.get("jokers", [])
             jokers = [JOKER_DATABASE[j["id"]].copy() for j in joker_data if j["id"] in JOKER_DATABASE]
+            for idx in range(len(jokers)):
+                jokers[idx].custom_data = joker_data[idx].get("custom_data", {})
 
             consumable_data = game_data.get("consumables", [])
             consumables = [TAROT_DATABASE[c["id"]].copy() for c in consumable_data if c["id"] in TAROT_DATABASE]
@@ -392,6 +394,12 @@ async def play_set(request: PlaySetRequest, id: str, background_tasks: Backgroun
 
     blind_info = get_current_blind_info(current_game)
     if current_game.round_score >= blind_info["score_required"]:
+        interest_cap = 5
+        interest_earned = min(current_game.money // 5, interest_cap)
+        current_game.money += interest_earned
+
+        trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_END_OF_ROUND)
+
         current_game.game_phase = "shop"
         current_game.money += 3 + current_game.boards_remaining
         current_game.shop_state = ShopState()
@@ -674,12 +682,6 @@ async def leave_shop(id: str):
     current_game = GAME_SAVES[id]
 
     if not current_game or current_game.game_phase != "shop": raise HTTPException(status_code=400, detail="Not in a shop phase.")
-
-    trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_END_OF_ROUND)
-
-    interest_cap = 5
-    interest_earned = min(current_game.money // 5, interest_cap)
-    current_game.money += interest_earned
     
     current_game.current_blind_index += 1
     if current_game.current_blind_index >= len(ANTE_CONFIG[current_game.ante]["names"]):
