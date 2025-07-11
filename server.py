@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from fastapi import BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List
 import uvicorn
 import random
 import sys
@@ -13,12 +14,14 @@ import itertools
 import math
 from uuid import uuid4
 
-from balatro_set_core import JokerTrigger, ConsumableTrigger, ScoreLogEntry, ScoringContext, ConsumableContext, GameContext, JokerAbility, ConsumableAbility, Joker, ConsumableCard, JokerVariant
+from balatro_set_classes import Joker, JokerTrigger, ConsumableTrigger, ScoreLogEntry, ScoringContext, ConsumableContext, GameContext, JokerVariant
+from balatro_set_classes import Card, ShopSlot, PackOpeningChoice, PackOpeningState, BoosterPack, ShopState, GameState
+from balatro_set_cards import JOKER_RARITY_PRICES, JOKER_VARIANT_PRICES_MULT
 from balatro_set_core import get_current_blind_info, get_joker_by_name, get_random_joker_by_rarity, get_random_pack_rarity
-from balatro_set_core import JOKER_DATABASE, TAROT_DATABASE, JOKER_RARITY_PRICES, ANTE_CONFIG, PACK_RARITIES, JOKER_VARIANT_PRICES_MULT
+from balatro_set_core import ANTE_CONFIG, PACK_RARITIES
+from balatro_set_cards import JOKER_DATABASE, TAROT_DATABASE
 from balatro_set_core import b_create_deck, b_is_set
-from balatro_set_core import Card, ShopSlot, PackOpeningChoice, PackOpeningState, BoosterPack, ShopState, GameState
-from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities, update_joker_badges
+from balatro_set_core import trigger_joker_abilities, trigger_consumable_abilities
 
 app = FastAPI()
 app.add_middleware(
@@ -45,7 +48,13 @@ if os.path.exists("balatro-saves.json"):
         data = json.load(f)
         for uid, game_data in data.items():
             joker_data = game_data.get("jokers", [])
-            jokers = [JOKER_DATABASE[j["id"]].copy() for j in joker_data if j["id"] in JOKER_DATABASE]
+            jokers: List['Joker'] = []
+            for j in joker_data:
+                if j["id"] in JOKER_DATABASE:
+                    joker = JOKER_DATABASE[j["id"]].copy()
+                    joker.variant = j["variant"]
+                    jokers.append(joker)
+
             for idx in range(len(jokers)):
                 jokers[idx].custom_data = joker_data[idx].get("custom_data", {})
 
@@ -278,7 +287,8 @@ async def play_set(request: PlaySetRequest, id: str, background_tasks: Backgroun
         uniform_features=uniform_features,
         ladder_features=ladder_features,
         set_type_string=set_type_string,
-        score_log=[]
+        score_log=[],
+        scoring_cards=selected_cards
     )
 
     # Log base set score
@@ -490,10 +500,16 @@ async def buy_joker(request: BuyJokerRequest, id: str):
     if slot.is_purchased: raise HTTPException(status_code=400, detail="Item already purchased.")
     if current_game.money < slot.price: raise HTTPException(status_code=400, detail="Not enough money.")
     
+    joker_to_buy = slot.item.copy()
+
+    for ability_def in joker_to_buy.abilities:
+        if ability_def.trigger == JokerTrigger.ON_BUY_SELF:
+            ability_def.ability(joker_to_buy, GameContext(game=current_game))
+            
     current_game.money -= slot.price
-    current_game.jokers.append(slot.item.copy())
-    if slot.item.variant == JokerVariant.NEGATIVE:
-        current_game.joker_slots += 1
+    current_game.jokers.append(joker_to_buy)
+    """ if slot.item.variant == JokerVariant.NEGATIVE:
+        current_game.joker_slots += 1 """
     slot.is_purchased = True
     trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_BUY_JOKER)
     return {"game_state": current_game.model_dump()}
@@ -519,8 +535,9 @@ async def sell_joker(request: SellJokerRequest, id: str):
     # Sell price is half of the rarity price, rounded down
     sell_price = math.ceil(JOKER_RARITY_PRICES.get(joker_to_sell.rarity, 4) * JOKER_VARIANT_PRICES_MULT[joker_to_sell.variant]) // 2
     current_game.money += sell_price
-    if joker_to_sell.variant == JokerVariant.NEGATIVE:
-        current_game.joker_slots -= 1
+    """ if joker_to_sell.variant == JokerVariant.NEGATIVE:
+        current_game.joker_slots -= 1 """
+    trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_DESTROY_JOKER)
     return {"game_state": current_game.model_dump(), "message": f"Sold {joker_to_sell.name} for ${sell_price}."}
 
 @app.post("/api/balatro/buy_booster_pack")
@@ -693,8 +710,8 @@ async def leave_shop(id: str):
     
     current_game.game_phase = "playing"
     current_game.round_score = 0
-    current_game.boards_remaining = 4
-    current_game.discards_remaining = 3
+    current_game.boards_remaining = current_game.boards_per_round
+    current_game.discards_remaining = current_game.discards_per_round
     current_game.played_set_types = []
     current_game.board_size = current_game.base_board_size
 
@@ -722,6 +739,8 @@ async def leave_shop(id: str):
     game_state_dict = current_game.model_dump()
     game_state_dict["current_blind"] = blind_info["name"]
     game_state_dict["blind_score_required"] = blind_info["score_required"]
+
+    trigger_joker_abilities(GameContext(game=current_game), JokerTrigger.ON_START_ROUND) #May not work correctly
     return {"game_state": game_state_dict}
 
 @app.post("/api/balatro/set_money", include_in_schema=False)
