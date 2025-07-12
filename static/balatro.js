@@ -129,7 +129,8 @@ function init() {
     returnToLobbyButton: document.getElementById('return-to-lobby-button'),
     scoringDisplay: document.getElementById('scoring-display'),
     shopArea: document.getElementById('shop-area'),
-    shopItems: document.getElementById('shop-items'),
+    cardItems: document.getElementById('card-items'),
+    packItems: document.getElementById('pack-items'),
     closeShopButton: document.getElementById('close-shop-button'),
     bossBlindEffectDisplay: document.getElementById('boss-blind-effect-display'),
     bossBlindEffectText: document.getElementById('boss-blind-effect-text'),
@@ -756,7 +757,8 @@ function renderConsumable(consumable, index) {
 }
 
 function renderShop(gameState) {
-    DOMElements.shopItems.innerHTML = '';
+    DOMElements.cardItems.innerHTML = '';
+    DOMElements.packItems.innerHTML = '';
     const { shop_state, money, jokers, joker_slots } = gameState;
 
     shop_state.joker_slots.forEach((slot, index) => {
@@ -781,27 +783,33 @@ function renderShop(gameState) {
             shopItemEl.appendChild(buyButton);
         }
         
-        DOMElements.shopItems.appendChild(shopItemEl);
+        DOMElements.cardItems.appendChild(shopItemEl);
     });
 
     // Render Booster Packs
     shop_state.booster_pack_slots.forEach((pack, index) => {
         const shopItemEl = document.createElement('div');
-        shopItemEl.classList.add('shop-item', 'booster-pack-item');
+        shopItemEl.classList.add('shop-item');
 
-        shopItemEl.innerHTML = `<div class="name">${pack.name}</div>`;
+        if(pack) {
+            const packItem = document.createElement('div');
+            packItem.classList.add('booster-pack-item');
+            packItem.innerHTML = `<div class="name">${pack.name}</div>`;
+            shopItemEl.appendChild(packItem);
 
-        const buyButton = document.createElement('button');
-        buyButton.textContent = `Buy ($${pack.price})`;
-        buyButton.disabled = pack.is_purchased || money < pack.price;
+            const buyButton = document.createElement('button');
+            buyButton.textContent = `Buy ($${pack.price})`;
+            buyButton.disabled = pack.is_purchased || money < pack.price;
 
-        if (pack.is_purchased) {
-            buyButton.textContent = 'Sold';
+            if (pack.is_purchased) {
+                buyButton.textContent = 'Sold';
+            }
+
+            buyButton.addEventListener('click', () => handleBuyBoosterPack(index));
+            shopItemEl.appendChild(buyButton);
+
         }
-
-        buyButton.addEventListener('click', () => handleBuyBoosterPack(index));
-        shopItemEl.appendChild(buyButton);
-        DOMElements.shopItems.appendChild(shopItemEl);
+        DOMElements.packItems.appendChild(shopItemEl);
     });
 }
 
